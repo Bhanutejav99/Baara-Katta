@@ -364,7 +364,7 @@ export default function App() {
     <div className="h-[100dvh] w-full flex flex-col xl:flex-row xl:items-center xl:justify-center overflow-hidden bg-black/20">
       
       {/* MOBILE HEADER */}
-      <div className="xl:hidden flex justify-between items-center p-4 bg-[#2a1b15]/90 backdrop-blur-md border-b border-[#5d4037] z-30 shrink-0 shadow-lg">
+      <div className="xl:hidden flex justify-between items-center px-4 py-2 bg-[#2a1b15]/90 backdrop-blur-md border-b border-[#5d4037] z-30 shrink-0 shadow-lg h-14">
          <button onClick={() => setSetupStep('MODE')} className="text-[10px] font-bold text-amber-500/80 border border-amber-500/30 px-3 py-1 rounded-full uppercase tracking-wider">
             Surrender
          </button>
@@ -372,17 +372,17 @@ export default function App() {
              {gameState.players.map(p => {
                const isActive = p.id === gameState.currentPlayerId;
                return (
-                 <div key={p.id} className={`w-6 h-6 rounded-full border-2 transition-all ${p.color} ${isActive ? 'scale-125 border-white shadow-[0_0_10px_white]' : 'border-transparent opacity-50'}`}></div>
+                 <div key={p.id} className={`w-5 h-5 rounded-full border-2 transition-all ${p.color} ${isActive ? 'scale-125 border-white shadow-[0_0_10px_white]' : 'border-transparent opacity-50'}`}></div>
                )
              })}
          </div>
       </div>
 
       {/* GAME AREA */}
-      <div className="flex-1 flex items-center justify-center relative p-2 overflow-hidden perspective-board">
+      <div className="flex-1 flex items-center justify-center relative p-0 overflow-hidden perspective-board">
           {gameState.winner !== null && <ConfettiRain />}
           
-          <div className="scale-[0.85] md:scale-100 xl:scale-100 transition-transform duration-500">
+          <div className="transition-transform duration-500 w-full h-full flex items-center justify-center">
             <Board gameState={gameState} onPieceClick={handlePieceClick} />
           </div>
           
@@ -409,20 +409,20 @@ export default function App() {
       </div>
 
       {/* MOBILE BOTTOM CONTROLS */}
-      <div className="xl:hidden w-full bg-[#1a0f0d] pb-6 pt-2 px-4 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.9)] z-40 border-t-2 border-[#5d4037] shrink-0">
-          <div className="flex items-center gap-4 h-24">
+      <div className="xl:hidden w-full bg-[#1a0f0d] pb-4 pt-2 px-3 rounded-t-[1.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.9)] z-40 border-t-2 border-[#5d4037] shrink-0">
+          <div className="flex items-center gap-3 h-20">
                {/* Player Avatar */}
                <div className={`
-                  w-16 h-16 rounded-2xl bg-gradient-to-br ${currentPlayer.gradient} 
+                  w-14 h-14 rounded-2xl bg-gradient-to-br ${currentPlayer.gradient} 
                   border-2 border-amber-500/50 shadow-lg flex flex-col items-center justify-center shrink-0 relative overflow-hidden
                `}>
                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
-                   <div className="text-2xl relative z-10">{currentPlayer.isBot ? '🤖' : '👤'}</div>
-                   <div className="text-[9px] font-bold text-white uppercase mt-1 relative z-10">{currentPlayer.name}</div>
+                   <div className="text-xl relative z-10">{currentPlayer.isBot ? '🤖' : '👤'}</div>
+                   <div className="text-[8px] font-bold text-white uppercase mt-1 relative z-10 max-w-[50px] truncate">{currentPlayer.name}</div>
                </div>
 
                {/* Dice Module */}
-               <div className="flex-1 h-full">
+               <div className="flex-1 h-full flex items-center">
                   <CowrieDice 
                     value={gameState.lastDiceFace || 0} 
                     rolling={gameState.isRolling} 
@@ -436,15 +436,15 @@ export default function App() {
           </div>
           
           {/* Moves Strip */}
-          <div className="h-8 mt-2 flex justify-center items-center">
+          <div className="h-6 mt-1 flex justify-center items-center">
              {gameState.diceValues.length > 0 ? (
                 <div className="flex gap-2 animate-pulse">
                    {gameState.diceValues.map((v, i) => (
-                      <span key={i} className="bg-amber-500 text-black font-bold px-3 py-0.5 rounded shadow-lg text-sm">Move {v}</span>
+                      <span key={i} className="bg-amber-500 text-black font-bold px-2 py-0.5 rounded shadow-lg text-xs">Move {v}</span>
                    ))}
                 </div>
              ) : (
-                <span className="text-xs text-gray-600 uppercase tracking-widest">{gameState.isRolling ? 'Fates are turning...' : 'Waiting for roll...'}</span>
+                <span className="text-[10px] text-gray-600 uppercase tracking-widest">{gameState.isRolling ? 'Fates are turning...' : 'Waiting for roll...'}</span>
              )}
           </div>
       </div>

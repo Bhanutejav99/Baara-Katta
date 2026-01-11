@@ -113,11 +113,11 @@ const HomeTray = ({
 
   // Adjust container dimensions to allow more space for pawns
   const containerClass = orientation === 'vertical' 
-    ? 'flex flex-col-reverse items-center justify-center py-2 w-14 md:w-20 min-h-[150px] md:min-h-[180px]' 
-    : 'flex flex-row items-center justify-center px-2 h-14 md:h-20 min-w-[150px] md:min-w-[180px]';
+    ? 'flex flex-col-reverse items-center justify-center py-2 w-12 md:w-20 min-h-[140px] md:min-h-[180px]' 
+    : 'flex flex-row items-center justify-center px-2 h-12 md:h-20 min-w-[140px] md:min-w-[180px]';
 
   // Significantly reduced negative spacing to show pawn heads clearly
-  const spacingClass = orientation === 'vertical' ? '-space-y-2' : '-space-x-2';
+  const spacingClass = orientation === 'vertical' ? '-space-y-3' : '-space-x-3';
   
   return (
     <div className={`
@@ -141,12 +141,7 @@ const HomeTray = ({
              const isMovable = isCurrentPlayer && gameState.diceValues.some(val => canMovePiece(gameState, p, val));
 
              // Correct Z-Index logic:
-             // For vertical (col-reverse), the first item (0) is visually at the bottom.
-             // We want the bottom item to be in FRONT of the item above it, so its head covers the feet of the one above?
-             // No, we want to see heads. The head is at the top of the icon.
-             // If Item 1 is above Item 0. Item 1's feet overlap Item 0's head.
-             // To see Item 0's head, Item 0 must be in FRONT of Item 1.
-             // So lower index (visually lower on screen) should have HIGHER z-index.
+             // Lower index (visually lower) should be ON TOP so its head is visible.
              const zStyle = orientation === 'vertical' ? { zIndex: 20 - i } : { zIndex: i };
 
              return (
@@ -157,7 +152,7 @@ const HomeTray = ({
                      onPieceClick(p.owner, p.id);
                   }}
                   style={zStyle}
-                  className={`relative w-9 h-9 md:w-14 md:h-14 transition-all duration-300
+                  className={`relative w-8 h-8 md:w-14 md:h-14 transition-all duration-300
                      ${isMovable ? 'animate-bounce cursor-pointer brightness-125 drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : ''}
                      hover:scale-110
                   `}
@@ -201,7 +196,7 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
   const isSafe = (r: number, c: number) => isSafeSquare(r, c, boardSize);
 
   return (
-    <div className="relative p-8 md:p-20">
+    <div className="relative p-3 md:p-20">
       {/* 
         Board Structure:
         1. Outer Shadow (Lift)
@@ -209,23 +204,23 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
         3. Gold Inlay Border
         4. Inner Grid Area
       */}
-      <div className="absolute inset-0 bg-[#3e2723] rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.8),0_0_0_2px_#5d4037] overflow-hidden">
+      <div className="absolute inset-0 bg-[#3e2723] rounded-[1.5rem] md:rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.8),0_0_0_2px_#5d4037] overflow-hidden">
           {/* Rich Wood Grain Texture */}
           <div className="absolute inset-0 opacity-60" 
              style={{ 
                 backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h20v20H0V0zm10 10h10v10H10V10zM0 10h10v10H0V10zM10 0h10v10H10V0z' fill='%23281510' fill-opacity='0.2'/%3E%3C/svg%3E"), linear-gradient(45deg, #3e2723, #5d4037)` 
              }}></div>
           {/* Gold Inlay Border */}
-          <div className="absolute inset-2 border-[4px] border-[#b45309] rounded-[2rem] opacity-70"></div>
-          <div className="absolute inset-4 border border-[#fcd34d] rounded-[1.8rem] opacity-40"></div>
+          <div className="absolute inset-2 border-[4px] border-[#b45309] rounded-[1.2rem] md:rounded-[2rem] opacity-70"></div>
+          <div className="absolute inset-4 border border-[#fcd34d] rounded-[1rem] md:rounded-[1.8rem] opacity-40"></div>
       </div>
 
       {/* Grid Container */}
       <div 
         className={`relative z-10 grid gap-[2px] bg-[#2a1b15] border-[6px] border-[#4e342e] shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] rounded-xl overflow-hidden`}
         style={{ 
-          width: 'min(60vw, 600px)', 
-          height: 'min(60vw, 600px)',
+          width: 'min(78vw, 600px)', 
+          height: 'min(78vw, 600px)',
           gridTemplateColumns: `repeat(${boardSize}, minmax(0, 1fr))`,
           gridTemplateRows: `repeat(${boardSize}, minmax(0, 1fr))`
         }}
@@ -264,7 +259,7 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
               {isCenterSpot && <CenterIcon />}
 
               {/* Pieces */}
-              <div className={`grid ${gridClass} w-full h-full p-1 items-center justify-items-center z-10 gap-0.5`}>
+              <div className={`grid ${gridClass} w-full h-full p-0.5 items-center justify-items-center z-10 gap-0.5`}>
                 {pieces.map((p) => {
                   const isCurrentPlayer = gameState.currentPlayerId === p.owner;
                   const isMovable = isCurrentPlayer && gameState.diceValues.some(val => canMovePiece(gameState, p, val));
@@ -297,7 +292,7 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
         })}
       </div>
 
-      {/* Home Trays Positioned around Board */}
+      {/* Home Trays Positioned around Board with slightly tighter offsets for mobile */}
       <HomeTray 
         playerIdx={PlayerId.P1} 
         gameState={gameState} 
@@ -311,7 +306,7 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
         gameState={gameState} 
         onPieceClick={onPieceClick} 
         orientation="vertical"
-        styleClass="right-[-1.5rem] md:right-[-2rem] top-1/2 -translate-y-1/2" 
+        styleClass="right-[-1.25rem] md:right-[-2rem] top-1/2 -translate-y-1/2" 
       />
       
       <HomeTray 
@@ -327,7 +322,7 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
         gameState={gameState} 
         onPieceClick={onPieceClick} 
         orientation="vertical"
-        styleClass="left-[-1.5rem] md:left-[-2rem] top-1/2 -translate-y-1/2" 
+        styleClass="left-[-1.25rem] md:left-[-2rem] top-1/2 -translate-y-1/2" 
       />
 
     </div>

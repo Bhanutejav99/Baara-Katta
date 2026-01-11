@@ -17,7 +17,7 @@ const CowrieShell: React.FC<{ isOpen: boolean; index: number; compact?: boolean 
   return (
     <div 
       className={`relative transition-all duration-500 transform drop-shadow-lg
-        ${compact ? 'w-6 h-8' : 'w-10 h-14'}
+        ${compact ? 'w-5 h-7' : 'w-10 h-14'}
       `}
       style={{ transform: `rotate(${rotation}deg)` }}
     >
@@ -105,10 +105,10 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({ value, rolling, onRoll, 
     return (
       <div className="flex items-center gap-2 w-full h-full">
          {/* Wooden Box */}
-         <div className="relative flex-shrink-0 p-2 rounded-xl bg-[#2a1b15] border-2 border-[#5d4037] shadow-[inset_0_2px_10px_rgba(0,0,0,0.8)] h-20 w-auto min-w-[140px] flex items-center justify-center overflow-hidden">
+         <div className="relative flex-shrink-0 p-1.5 rounded-xl bg-[#2a1b15] border-2 border-[#5d4037] shadow-[inset_0_2px_10px_rgba(0,0,0,0.8)] h-16 w-auto min-w-[120px] flex items-center justify-center overflow-hidden">
             {/* Velvet Lining */}
             <div className="absolute inset-0 bg-[#450a0a] opacity-40"></div>
-            <div className={`relative z-10 flex flex-wrap justify-center gap-1 ${rolling ? 'animate-bounce blur-[1px]' : ''}`} style={{ maxWidth: '160px'}}>
+            <div className={`relative z-10 flex flex-wrap justify-center gap-1 ${rolling ? 'animate-bounce blur-[1px]' : ''}`} style={{ maxWidth: '140px'}}>
                 {shells.map((isOpen, idx) => (
                   <CowrieShell key={idx} index={idx} isOpen={isOpen} compact={true} />
                 ))}
@@ -116,14 +116,14 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({ value, rolling, onRoll, 
          </div>
 
          {/* Controls */}
-         <div className="flex-1 flex flex-col justify-center h-full gap-2">
+         <div className="flex-1 flex flex-col justify-center h-full gap-1">
              <div className="text-[10px] font-bold text-amber-200 uppercase tracking-widest text-center drop-shadow-md whitespace-nowrap">
                {getLabel()}
              </div>
              <button
               onClick={onRoll}
               disabled={disabled || !canRoll}
-              className={`${buttonBaseClass} ${buttonStateClass} w-full py-2 text-sm`}
+              className={`${buttonBaseClass} ${buttonStateClass} w-full py-2 text-xs`}
             >
               ROLL
               {/* Shine effect */}
