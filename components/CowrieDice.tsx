@@ -8,157 +8,200 @@ interface CowrieDiceProps {
   disabled: boolean;
   canRoll: boolean;
   layout?: 'vertical' | 'horizontal'; 
-  maxShells?: number; // Added to support 4 or 6 shells
+  maxShells?: number;
+  hideButton?: boolean;
 }
 
-// Realistic Shell SVG
+// Photorealistic 3D Cowrie Shell (Ivory White Open Face vs Warm Amber Shell Back)
 const CowrieShell: React.FC<{ isOpen: boolean; index: number; compact?: boolean }> = ({ isOpen, index, compact }) => {
-  const rotation = React.useMemo(() => Math.random() * 360, []); 
-  
+  const rotation = React.useMemo(() => (index * 45 + 15) % 360, [index]);
+  const width = compact ? 34 : 64;
+  const height = compact ? 48 : 88;
+
   return (
-    <div 
-      className={`relative transition-all duration-500 transform drop-shadow-lg
-        ${compact ? 'w-5 h-7' : 'w-10 h-14'}
-      `}
-      style={{ transform: `rotate(${rotation}deg)` }}
-    >
-        <svg viewBox="0 0 100 130" className="w-full h-full">
-            <defs>
-              <filter id="shadow">
-                <feDropShadow dx="2" dy="4" stdDeviation="3" floodOpacity="0.5"/>
-              </filter>
-              <linearGradient id="shellBody" x1="0%" y1="0%" x2="100%" y2="100%">
-                 <stop offset="0%" stopColor="#fef3c7" />
-                 <stop offset="100%" stopColor="#d4d4d4" />
-              </linearGradient>
-              <radialGradient id="shellBack" cx="40%" cy="40%" r="80%">
-                  <stop offset="0%" stopColor="#d97706" />
-                  <stop offset="100%" stopColor="#451a03" />
-              </radialGradient>
-            </defs>
-            {isOpen ? (
-                <g filter="url(#shadow)">
-                    {/* Open Face */}
-                    <ellipse cx="50" cy="65" rx="45" ry="60" fill="url(#shellBody)" stroke="#a3a3a3" strokeWidth="1" />
-                    {/* The Slit */}
-                    <path d="M50 15 Q 55 65 50 115" stroke="#a3a3a3" strokeWidth="2" fill="none" />
-                    {/* Teeth detail */}
-                    {[25,35,45,55,65,75,85,95].map(y => (
-                       <path key={y} d={`M42 ${y} L 58 ${y}`} stroke="#737373" strokeWidth="2" strokeLinecap="round" />
-                    ))}
-                </g>
-            ) : (
-                <g filter="url(#shadow)">
-                   {/* Closed Back */}
-                   <ellipse cx="50" cy="65" rx="45" ry="60" fill="url(#shellBack)" />
-                   <path d="M50 10 Q 90 65 50 120" stroke="rgba(255,255,255,0.1)" strokeWidth="2" fill="none" />
-                   {/* Specular Highlight */}
-                   <ellipse cx="35" cy="40" rx="10" ry="18" fill="white" fillOpacity="0.15" transform="rotate(-20 35 40)" />
-                </g>
-            )}
+    <div className="flex flex-col items-center gap-1.5 shrink-0 transition-transform duration-300 hover:scale-110">
+      <div 
+        className={`relative flex items-center justify-center rounded-full p-1 transition-all duration-500
+          ${isOpen 
+            ? 'ring-3 ring-amber-300 shadow-[0_0_20px_rgba(255,255,255,0.9)] bg-white/20' 
+            : 'ring-2 ring-amber-900/80 shadow-[0_6px_12px_rgba(0,0,0,0.9)] bg-black/50'}
+        `}
+        style={{ 
+          width: `${width}px`, 
+          height: `${height}px`,
+          transform: `rotate(${rotation}deg)`
+        }}
+      >
+        <svg 
+          viewBox="0 0 100 135" 
+          style={{ width: '100%', height: '100%', display: 'block', filter: 'drop-shadow(0px 8px 12px rgba(0,0,0,0.85))' }}
+        >
+          <defs>
+            {/* OPEN FACE: Luxurious Polished Ivory White & Cream */}
+            <linearGradient id={`open-ivory-grad-v3-${index}`} x1="0%" y1="0%" x2="100%" y2="100%">
+               <stop offset="0%" stopColor="#ffffff" />
+               <stop offset="45%" stopColor="#fffbeb" />
+               <stop offset="85%" stopColor="#f1f5f9" />
+               <stop offset="100%" stopColor="#cbd5e1" />
+            </linearGradient>
+
+            {/* CLOSED BACK: Rich Warm Amber & Glossy Golden Mahogany */}
+            <radialGradient id={`closed-amber-grad-v3-${index}`} cx="40%" cy="30%" r="80%">
+                <stop offset="0%" stopColor="#fef08a" />
+                <stop offset="25%" stopColor="#f59e0b" />
+                <stop offset="65%" stopColor="#b45309" />
+                <stop offset="90%" stopColor="#78350f" />
+                <stop offset="100%" stopColor="#451a03" />
+            </radialGradient>
+          </defs>
+
+          {isOpen ? (
+            /* FACE UP / OPEN SHELL (IVORY SLIT & NATURAL TEETH) */
+            <g>
+              <ellipse cx="50" cy="67.5" rx="45" ry="60" fill={`url(#open-ivory-grad-v3-${index})`} stroke="#94a3b8" strokeWidth="2.5" />
+              <ellipse cx="50" cy="67.5" rx="36" ry="50" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.5" />
+              <path d="M50 14 Q 58 67.5 50 121" stroke="#0f172a" strokeWidth="5" fill="none" strokeLinecap="round" />
+              {[26, 36, 46, 56, 66, 76, 86, 96, 106].map(y => (
+                 <path key={y} d={`M35 ${y} L 65 ${y}`} stroke="#334155" strokeWidth="3" strokeLinecap="round" />
+              ))}
+              <path d="M50 20 Q 53 67.5 50 115" stroke="#020617" strokeWidth="2" fill="none" />
+              <ellipse cx="32" cy="35" rx="8" ry="18" fill="#ffffff" fillOpacity="0.7" transform="rotate(-15 32 35)" />
+            </g>
+          ) : (
+            /* FACE DOWN / CLOSED SHELL (GLOSSY WARM AMBER DOME) */
+            <g>
+               <ellipse cx="50" cy="67.5" rx="45" ry="60" fill={`url(#closed-amber-grad-v3-${index})`} stroke="#fbbf24" strokeWidth="2.5" />
+               <path d="M50 10 Q 88 67.5 50 125" stroke="rgba(255,255,255,0.7)" strokeWidth="3.5" fill="none" />
+               <path d="M50 10 Q 12 67.5 50 125" stroke="rgba(0,0,0,0.5)" strokeWidth="3" fill="none" />
+               <ellipse cx="32" cy="35" rx="14" ry="24" fill="#ffffff" fillOpacity="0.65" transform="rotate(-25 32 35)" />
+            </g>
+          )}
         </svg>
+      </div>
+
+      {!compact && (
+        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-md ${isOpen ? 'bg-white text-slate-900 border border-amber-400' : 'bg-[#451a03] text-amber-200 border border-amber-600'}`}>
+          {isOpen ? '⚪ Open' : '🟤 Back'}
+        </span>
+      )}
     </div>
   );
 };
 
-export const CowrieDice: React.FC<CowrieDiceProps> = ({ value, rolling, onRoll, disabled, canRoll, layout = 'vertical', maxShells = 4 }) => {
-  // Determine how many shells are "open" based on the roll value
+export const CowrieDice: React.FC<CowrieDiceProps> = ({ 
+  value, 
+  rolling, 
+  onRoll, 
+  disabled, 
+  canRoll, 
+  layout = 'vertical', 
+  maxShells = 4,
+  hideButton = false
+}) => {
   const openCount = React.useMemo(() => {
      if (maxShells === 4) {
-         if (value === 8) return 0; // Ashta (8) -> 0 open
+         if (value === 8) return 0; // Ashta (8) -> 0 open (all 4 closed back)
          return value;
      } else {
-         if (value === 12) return 0; // Baara (12) -> 0 open
-         return value; // For 6, 6 are open.
+         if (value === 12) return 0; // Baara (12) -> 0 open (all 6 closed back)
+         return value;
      }
   }, [value, maxShells]);
 
+  const closedCount = maxShells - openCount;
+
   const shells = React.useMemo(() => {
     const arr = Array(maxShells).fill(false);
-    for(let i=0; i<openCount; i++) arr[i] = true;
+    for (let i = 0; i < openCount; i++) arr[i] = true;
     return arr;
   }, [openCount, maxShells]);
 
-  // Button Styles
-  const buttonBaseClass = `
-    relative overflow-hidden font-display font-bold tracking-widest text-white shadow-lg transition-all duration-200
-    border-2 border-[#b45309] rounded-xl
-  `;
-  const buttonStateClass = disabled || !canRoll
-    ? 'bg-gray-800 text-gray-500 cursor-not-allowed grayscale'
-    : 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 active:scale-95 animate-pulse-gold';
-
   const getLabel = () => {
-    if (rolling) return 'Flipping...';
-    if (value === 0) return 'Your Turn';
+    if (rolling) return 'Fates Turning...';
+    if (value === 0) return 'Roll Shells';
 
     if (maxShells === 4) {
-        if (value === 4) return '✨ Chowka (4)';
-        if (value === 8) return '🌟 Ashta (8)';
+        if (value === 4) return '✨ CHOWKA (4) + BONUS ROLL!';
+        if (value === 8) return '🌟 ASHTA (8) + BONUS ROLL!';
     } else {
-        if (value === 6) return '✨ Katta (6)';
-        if (value === 12) return '🌟 Baara (12)';
+        if (value === 6) return '✨ KATTA (6) + BONUS ROLL!';
+        if (value === 12) return '🌟 BAARA (12) + BONUS ROLL!';
     }
     return `Score: ${value}`;
   };
 
+  const buttonBaseClass = `
+    relative overflow-hidden font-display font-bold tracking-widest text-white shadow-2xl transition-all duration-200
+    border-2 border-amber-300 rounded-2xl uppercase
+  `;
+  const buttonStateClass = disabled || !canRoll
+    ? 'bg-gray-800/80 text-gray-500 cursor-not-allowed border-gray-600 grayscale'
+    : 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 active:scale-95 shadow-[0_0_25px_rgba(245,158,11,0.6)] animate-pulse-gold';
+
   if (layout === 'horizontal') {
     return (
-      <div className="flex items-center gap-2 w-full h-full">
-         {/* Wooden Box */}
-         <div className="relative flex-shrink-0 p-1.5 rounded-xl bg-[#2a1b15] border-2 border-[#5d4037] shadow-[inset_0_2px_10px_rgba(0,0,0,0.8)] h-16 w-auto min-w-[120px] flex items-center justify-center overflow-hidden">
-            {/* Velvet Lining */}
-            <div className="absolute inset-0 bg-[#450a0a] opacity-40"></div>
-            <div className={`relative z-10 flex flex-wrap justify-center gap-1 ${rolling ? 'animate-bounce blur-[1px]' : ''}`} style={{ maxWidth: '140px'}}>
+      <div className="flex items-center justify-center gap-3 w-full h-full">
+         {/* Wooden Tray with Emerald Velvet Interior */}
+         <div className="relative flex-shrink-0 p-2 sm:p-2.5 rounded-2xl bg-[#2a1b15] border-2 border-[#5d4037] shadow-[inset_0_2px_12px_rgba(0,0,0,0.9)] h-16 sm:h-20 w-auto min-w-[150px] sm:min-w-[180px] flex items-center justify-center overflow-hidden">
+            <div className="absolute inset-1 bg-gradient-to-br from-[#064e3b] to-[#022c22] opacity-90 rounded-xl shadow-inner border border-emerald-400/40"></div>
+            <div className={`relative z-10 flex items-center justify-center gap-2 ${rolling ? 'animate-bounce blur-[0.5px]' : ''}`}>
                 {shells.map((isOpen, idx) => (
                   <CowrieShell key={idx} index={idx} isOpen={isOpen} compact={true} />
                 ))}
             </div>
          </div>
 
-         {/* Controls */}
-         <div className="flex-1 flex flex-col justify-center h-full gap-1">
-             <div className="text-[10px] font-bold text-amber-200 uppercase tracking-widest text-center drop-shadow-md whitespace-nowrap">
+         {/* Roll Label */}
+         <div className="flex flex-col justify-center gap-1">
+             <div className="text-[10px] sm:text-xs font-bold text-amber-300 uppercase tracking-widest text-center drop-shadow whitespace-nowrap">
                {getLabel()}
              </div>
-             <button
-              onClick={() => { soundEngine.playShellRoll(); onRoll(); }}
-              disabled={disabled || !canRoll}
-              className={`${buttonBaseClass} ${buttonStateClass} w-full py-2 text-xs`}
-            >
-              ROLL
-              {/* Shine effect */}
-              {!disabled && canRoll && <div className="absolute top-0 -left-[100%] w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2s_infinite]"></div>}
-            </button>
+             {!hideButton && (
+               <button
+                onClick={() => { soundEngine.playShellRoll(); onRoll(); }}
+                disabled={disabled || !canRoll}
+                className={`${buttonBaseClass} ${buttonStateClass} w-full py-2 text-xs`}
+              >
+                ROLL DICE
+              </button>
+             )}
          </div>
       </div>
-    )
+    );
   }
 
-  // Desktop Vertical Layout
+  // Desktop Layout
   return (
-    <div className="flex flex-col items-center gap-6 w-full">
-      {/* Premium Wooden Tray */}
-      <div className="relative p-6 rounded-[2rem] bg-[#2a1b15] border-4 border-[#5d4037] shadow-2xl w-full max-w-[280px] min-h-[200px] flex items-center justify-center overflow-hidden">
-         {/* Inner Shadow & Velvet */}
-         <div className="absolute inset-0 bg-[#3f0e0e] opacity-30 shadow-[inset_0_0_40px_rgba(0,0,0,0.9)]"></div>
+    <div className="flex flex-col items-center gap-5 w-full">
+      {/* 3D Wooden Tray with Emerald Velvet Interior */}
+      <div className="relative p-6 md:p-8 rounded-[2.5rem] bg-[#2a1b15] border-4 border-[#5d4037] shadow-[0_25px_50px_rgba(0,0,0,0.9)] w-full max-w-[340px] min-h-[230px] flex flex-col items-center justify-center overflow-hidden">
+         {/* Velvet Cushion Backdrop */}
+         <div className="absolute inset-2 bg-gradient-to-br from-[#064e3b] via-[#043e2f] to-[#022c22] rounded-[2rem] border-2 border-emerald-400/40 shadow-[inset_0_0_35px_rgba(0,0,0,0.95)]"></div>
          
-         <div className={`relative z-10 grid grid-cols-2 gap-4 ${rolling ? 'animate-bounce blur-[1px]' : ''} transition-all`}>
+         {/* Shells Display */}
+         <div className={`relative z-10 flex flex-wrap justify-center items-center gap-4 ${rolling ? 'animate-bounce blur-[0.5px]' : ''} transition-all max-w-[280px]`}>
             {shells.map((isOpen, idx) => (
                <CowrieShell key={idx} index={idx} isOpen={isOpen} />
             ))}
         </div>
+
+        {/* Counter Summary Pill */}
+        <div className="relative z-10 mt-4 flex items-center gap-3 bg-black/75 px-4 py-1.5 rounded-full border border-amber-500/40 text-xs font-bold text-amber-200 shadow-md">
+           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-white border border-slate-400"></span> {openCount} Open (Ivory)</span>
+           <span className="text-amber-600">•</span>
+           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#54260a] border border-amber-600"></span> {closedCount} Back (Brown)</span>
+        </div>
       </div>
       
-      <div className="text-center w-full space-y-4">
-        <div className="text-xl font-display font-bold text-amber-100 uppercase tracking-[0.2em] drop-shadow-md">
+      <div className="text-center w-full space-y-3">
+        <div className="text-xl font-display font-bold text-amber-300 uppercase tracking-[0.15em] drop-shadow-md min-h-[30px]">
            {getLabel()}
         </div>
         
         <button
           onClick={() => { soundEngine.playShellRoll(); onRoll(); }}
           disabled={disabled || !canRoll}
-          className={`${buttonBaseClass} ${buttonStateClass} w-full py-5 text-xl`}
+          className={`${buttonBaseClass} ${buttonStateClass} w-full py-4 md:py-5 text-xl`}
         >
           ROLL DICE
         </button>

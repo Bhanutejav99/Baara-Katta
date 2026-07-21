@@ -24,6 +24,13 @@ export enum BotDifficulty {
   EMPEROR = 'EMPEROR'       // Aggressive minimax heuristic
 }
 
+export enum BoardTheme {
+  MAHOGANY = 'MAHOGANY',  // Classic Mahogany Wood
+  EMERALD = 'EMERALD',   // Deep Emerald & Gold
+  MARBLE = 'MARBLE',     // Imperial White Marble
+  SAPPHIRE = 'SAPPHIRE'   // Sapphire Court
+}
+
 export interface Coords {
   r: number;
   c: number;
@@ -60,5 +67,5 @@ export interface GameState {
   awaitingBonusRoll: boolean; // True if player gets an extra roll (e.g. after killing)
   gameMode: GameMode;
   botDifficulty: BotDifficulty;
+  theme: BoardTheme;
 }
-

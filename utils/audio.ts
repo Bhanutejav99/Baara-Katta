@@ -1,15 +1,27 @@
-// Web Audio API Sound Generator for Baara Katta
-// No external assets required - zero latency, synthesized sound engine
+// Web Audio API Sound Generator for Baara Katta (Ashta Chamma)
+// Zero latency, high-fidelity synthesized audio engine
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
 
   constructor() {
-    // Lazy init audio context on user interaction
     const storedMute = localStorage.getItem('baara_katta_muted');
     if (storedMute !== null) {
       this.isMuted = JSON.parse(storedMute);
+    }
+    
+    // Global listener to unlock Web Audio API on first user interaction
+    if (typeof window !== 'undefined') {
+      const unlockAudio = () => {
+        this.initCtx();
+        window.removeEventListener('click', unlockAudio);
+        window.removeEventListener('touchstart', unlockAudio);
+        window.removeEventListener('keydown', unlockAudio);
+      };
+      window.addEventListener('click', unlockAudio);
+      window.addEventListener('touchstart', unlockAudio);
+      window.addEventListener('keydown', unlockAudio);
     }
   }
 
@@ -35,35 +47,39 @@ class SoundEngine {
     return this.isMuted;
   }
 
-  // Play Cowrie Shell Roll / Clatter
+  // Play Cowrie Shell Roll / Clatter (Rich Wood & Shell Impact)
   public playShellRoll() {
     if (this.isMuted) return;
     this.initCtx();
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
-    const count = 7;
+    const count = 8;
+    
     for (let i = 0; i < count; i++) {
-      const delay = i * 0.05 + Math.random() * 0.03;
+      const delay = i * 0.04 + Math.random() * 0.02;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(800 + Math.random() * 1200, now + delay);
-      osc.frequency.exponentialRampToValueAtTime(300 + Math.random() * 200, now + delay + 0.04);
+      osc.type = Math.random() > 0.5 ? 'sine' : 'triangle';
+      const startFreq = 1200 + Math.random() * 1000;
+      const endFreq = 400 + Math.random() * 300;
 
-      gain.gain.setValueAtTime(0.2, now + delay);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.04);
+      osc.frequency.setValueAtTime(startFreq, now + delay);
+      osc.frequency.exponentialRampToValueAtTime(endFreq, now + delay + 0.05);
+
+      gain.gain.setValueAtTime(0.4, now + delay);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.05);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
       osc.start(now + delay);
-      osc.stop(now + delay + 0.05);
+      osc.stop(now + delay + 0.06);
     }
   }
 
-  // Play Piece Selection sound
+  // Play Piece Selection Sound (Crisp Bell Tone)
   public playSelect() {
     if (this.isMuted) return;
     this.initCtx();
@@ -73,21 +89,21 @@ class SoundEngine {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
 
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(523.25, now); // C5
-    osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.08); // E5
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(659.25, now); // E5
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.08); // A5
 
-    gain.gain.setValueAtTime(0.15, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
 
     osc.connect(gain);
     gain.connect(this.ctx.destination);
 
     osc.start(now);
-    osc.stop(now + 0.1);
+    osc.stop(now + 0.12);
   }
 
-  // Play Move Step sound
+  // Play Pawn Move Step Sound (Rich Wooden Tock)
   public playMove() {
     if (this.isMuted) return;
     this.initCtx();
@@ -97,12 +113,12 @@ class SoundEngine {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(440, now);
-    osc.frequency.exponentialRampToValueAtTime(220, now + 0.06);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(140, now + 0.06);
 
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.07);
 
     osc.connect(gain);
     gain.connect(this.ctx.destination);
@@ -111,76 +127,70 @@ class SoundEngine {
     osc.stop(now + 0.07);
   }
 
-  // Play Capture Strike sound
+  // Play Royal Capture Sound (Booming Battle Impact)
   public playCapture() {
     if (this.isMuted) return;
     this.initCtx();
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
+    
+    // Low Thud
+    const osc1 = this.ctx.createOscillator();
+    const gain1 = this.ctx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(250, now);
+    osc1.frequency.exponentialRampToValueAtTime(50, now + 0.25);
+    gain1.gain.setValueAtTime(0.6, now);
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+    osc1.connect(gain1);
+    gain1.connect(this.ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.25);
 
-    // Sub bass impact
-    const subOsc = this.ctx.createOscillator();
-    const subGain = this.ctx.createGain();
-    subOsc.type = 'sawtooth';
-    subOsc.frequency.setValueAtTime(200, now);
-    subOsc.frequency.exponentialRampToValueAtTime(40, now + 0.25);
-
-    subGain.gain.setValueAtTime(0.35, now);
-    subGain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-
-    subOsc.connect(subGain);
-    subGain.connect(this.ctx.destination);
-
-    subOsc.start(now);
-    subOsc.stop(now + 0.26);
-
-    // Clash accent
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(880, now);
-    osc.frequency.exponentialRampToValueAtTime(110, now + 0.15);
-
-    gain.gain.setValueAtTime(0.25, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.16);
+    // High Slice
+    const osc2 = this.ctx.createOscillator();
+    const gain2 = this.ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1200, now + 0.05);
+    osc2.frequency.exponentialRampToValueAtTime(300, now + 0.2);
+    gain2.gain.setValueAtTime(0.4, now + 0.05);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc2.connect(gain2);
+    gain2.connect(this.ctx.destination);
+    osc2.start(now + 0.05);
+    osc2.stop(now + 0.2);
   }
 
-  // Play Bonus Roll Fanfare
+  // Play Bonus Roll Chime (Ashta / Chowka / Katta / Baara Fanfare)
   public playBonus() {
     if (this.isMuted) return;
     this.initCtx();
     if (!this.ctx) return;
 
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
     const now = this.ctx.currentTime;
-
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 Arpeggio
+    
     notes.forEach((freq, idx) => {
       if (!this.ctx) return;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.07);
 
-      gain.gain.setValueAtTime(0.2, now + idx * 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.15);
+      gain.gain.setValueAtTime(0.35, now + idx * 0.07);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.07 + 0.15);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
-      osc.start(now + idx * 0.08);
-      osc.stop(now + idx * 0.08 + 0.16);
+      osc.start(now + idx * 0.07);
+      osc.stop(now + idx * 0.07 + 0.15);
     });
   }
 
-  // Play Invalid / Shake sound
+  // Play Error / Invalid Move Sound (Low Wood Block Thud)
   public playError() {
     if (this.isMuted) return;
     this.initCtx();
@@ -191,44 +201,52 @@ class SoundEngine {
     const gain = this.ctx.createGain();
 
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, now);
-    osc.frequency.linearRampToValueAtTime(100, now + 0.12);
+    osc.frequency.setValueAtTime(130, now);
+    osc.frequency.linearRampToValueAtTime(90, now + 0.15);
 
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
 
     osc.connect(gain);
     gain.connect(this.ctx.destination);
 
     osc.start(now);
-    osc.stop(now + 0.13);
+    osc.stop(now + 0.15);
   }
 
-  // Play Victory Fanfare
+  // Play Grand Victory Brass Fanfare
   public playVictory() {
     if (this.isMuted) return;
     this.initCtx();
     if (!this.ctx) return;
 
-    const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
     const now = this.ctx.currentTime;
+    const notes = [
+      { f: 523.25, d: 0.15 }, // C5
+      { f: 659.25, d: 0.15 }, // E5
+      { f: 783.99, d: 0.15 }, // G5
+      { f: 1046.50, d: 0.4 }  // C6
+    ];
 
-    notes.forEach((freq, idx) => {
+    let accum = 0;
+    notes.forEach(n => {
       if (!this.ctx) return;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(n.f, now + accum);
 
-      gain.gain.setValueAtTime(0.25, now + idx * 0.12);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.12 + 0.4);
+      gain.gain.setValueAtTime(0.5, now + accum);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + accum + n.d);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
 
-      osc.start(now + idx * 0.12);
-      osc.stop(now + idx * 0.12 + 0.45);
+      osc.start(now + accum);
+      osc.stop(now + accum + n.d);
+
+      accum += n.d * 0.8;
     });
   }
 }

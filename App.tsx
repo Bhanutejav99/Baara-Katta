@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { GameState, PlayerId, Piece, PieceStatus, Player, GameMode, BotDifficulty } from './types';
+import { GameState, PlayerId, Piece, PieceStatus, Player, GameMode, BotDifficulty, BoardTheme } from './types';
 import { PLAYER_CONFIG } from './constants';
-import { canMovePiece, movePiece, getBotMove } from './utils/gameLogic';
-import { Board } from './components/Board';
+import { canMovePiece, movePiece, getBotMove, checkWinner } from './utils/gameLogic';
+import { Board, THEME_STYLES } from './components/Board';
 import { CowrieDice } from './components/CowrieDice';
 import { RulesModal } from './components/RulesModal';
 import { soundEngine } from './utils/audio';
@@ -170,6 +170,14 @@ export default function App() {
     setIsMuted(muted);
   };
 
+  const cycleTheme = () => {
+    soundEngine.playSelect();
+    const themes = [BoardTheme.MAHOGANY, BoardTheme.EMERALD, BoardTheme.MARBLE, BoardTheme.SAPPHIRE];
+    const currentIndex = themes.indexOf(gameState.theme || BoardTheme.MAHOGANY);
+    const nextTheme = themes[(currentIndex + 1) % themes.length];
+    setGameState(prev => ({ ...prev, theme: nextTheme }));
+  };
+
   const startGame = (size: 5 | 7) => {
     setGameState(INITIAL_STATE(size, selectedMode, selectedDifficulty, selectedPlayerCount));
     setSetupStep('GAME');
@@ -185,7 +193,12 @@ export default function App() {
 
     setTimeout(() => {
       const maxShells = gameState.boardSize === 5 ? 4 : 6;
-      const openShells = Math.floor(Math.random() * (maxShells + 1)); 
+      
+      // Realistic Binomial Cowrie Shell Physics (6.25% chance for 4 or 8)
+      let openShells = 0;
+      for (let i = 0; i < maxShells; i++) {
+        if (Math.random() < 0.5) openShells++;
+      }
       
       let value = openShells;
       
@@ -248,11 +261,16 @@ export default function App() {
     const steps = gameState.diceValues[validDieIndex];
     
     setGameState(prev => {
+      const prevLogCount = prev.logs.length;
       const nextState = movePiece(prev, pieceIdx, steps);
       nextState.selectedDieIndex = null;
 
+      const hasCapture = nextState.logs.length > prevLogCount && nextState.logs[nextState.logs.length - 1].includes('captured');
+
       if (nextState.winner !== null) {
         soundEngine.playVictory();
+      } else if (hasCapture) {
+        soundEngine.playCapture();
       } else if (nextState.awaitingBonusRoll) {
         soundEngine.playBonus();
       } else {
@@ -270,6 +288,28 @@ export default function App() {
       selectedDieIndex: prev.selectedDieIndex === index ? null : index
     }));
   };
+
+  // Continuous Victory & Lockout Check
+  useEffect(() => {
+    if (setupStep !== 'GAME' || gameState.winner !== null) return;
+
+    const winResult = checkWinner(gameState);
+    if (winResult.winnerId !== null) {
+      soundEngine.playVictory();
+      setGameState(prev => {
+        if (prev.winner !== null) return prev;
+        const winnerName = prev.players[winResult.winnerId!].name;
+        const logMsg = winResult.isLockout 
+          ? `👑 ${winnerName} achieved Lockout Victory! Opponent has no pass to enter inner circle.`
+          : `🏆 ${winnerName} HAS WON THE GAME!`;
+        return {
+          ...prev,
+          winner: winResult.winnerId,
+          logs: [...prev.logs, logMsg]
+        };
+      });
+    }
+  }, [gameState, setupStep]);
 
   // Bot Loop
   useEffect(() => {
@@ -517,56 +557,67 @@ export default function App() {
   }
 
   const currentPlayer = gameState.players[gameState.currentPlayerId];
+  const currentTheme = gameState.theme || BoardTheme.MAHOGANY;
+  const currentThemeStyle = THEME_STYLES[currentTheme] || THEME_STYLES[BoardTheme.MAHOGANY];
 
+  // Main Game View Render
   return (
-    <div className="h-[100dvh] w-full flex flex-col xl:flex-row xl:items-center xl:justify-center overflow-hidden bg-black/20">
+    <div className={`h-[100dvh] w-full ${currentThemeStyle.appBg} text-amber-50 font-sans flex flex-col justify-between overflow-hidden select-none transition-colors duration-500`}>
       
-      {/* MOBILE HEADER */}
-      <div className="xl:hidden flex justify-between items-center px-4 py-2 bg-[#2a1b15]/90 backdrop-blur-md border-b border-[#5d4037] z-30 shrink-0 shadow-lg h-14">
+      {/* TOP ROYAL COURT HEADER BAR */}
+      <div className="w-full bg-[#1a0f0d]/95 backdrop-blur-xl border-b border-[#5d4037] px-4 py-2.5 flex items-center justify-between z-40 shrink-0 h-14 shadow-lg">
          <div className="flex items-center gap-2">
-            <button onClick={() => setSetupStep('MODE')} className="text-[10px] font-bold text-amber-500/80 border border-amber-500/30 px-3 py-1 rounded-full uppercase tracking-wider">
-               Exit
-            </button>
-            <button onClick={toggleSound} className="text-xs px-2 py-1 bg-black/40 rounded-full border border-amber-500/30 text-amber-300">
-               {isMuted ? '🔇' : '🔊'}
-            </button>
-            <button onClick={() => setShowRulesModal(true)} className="text-xs px-2 py-1 bg-black/40 rounded-full border border-amber-500/30 text-amber-300">
-               📜
-            </button>
+            <h1 className="text-lg sm:text-xl font-display font-bold text-amber-100 tracking-wider">
+               {gameState.boardSize === 5 ? 'Ashta Chamma' : 'Baara Katta'}
+            </h1>
+            <span className="hidden sm:inline-block text-[10px] font-bold px-2.5 py-0.5 bg-amber-950/80 border border-amber-500/40 text-amber-300 rounded-full uppercase tracking-widest">
+               {gameState.playerCount === 2 ? '1v1 Duel' : '4-Player'}
+            </span>
          </div>
 
-         <div className="flex gap-2">
-             {gameState.players.filter(p => p.pieces.length > 0).map(p => {
-               const isActive = p.id === gameState.currentPlayerId;
-               return (
-                 <div key={p.id} className={`w-5 h-5 rounded-full border-2 transition-all ${p.color} ${isActive ? 'scale-125 border-white shadow-[0_0_10px_white]' : 'border-transparent opacity-50'}`}></div>
-               )
-             })}
+         <div className="flex items-center gap-2">
+            <button 
+              onClick={cycleTheme} 
+              className="text-xs px-2.5 py-1 bg-amber-950/80 rounded-full border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-black transition-colors font-bold uppercase tracking-wider flex items-center gap-1 shadow"
+              title="Change Board Theme"
+            >
+              <span>🎨</span>
+              <span className="hidden xs:inline">{currentThemeStyle.name}</span>
+            </button>
+            <button onClick={toggleSound} className="text-xs px-2.5 py-1 bg-black/50 rounded-full border border-amber-500/30 text-amber-300 hover:bg-amber-500 hover:text-black transition-colors font-bold">
+              {isMuted ? '🔇' : '🔊'}
+            </button>
+            <button onClick={() => setShowRulesModal(true)} className="text-xs px-2.5 py-1 bg-black/50 rounded-full border border-amber-500/30 text-amber-300 hover:bg-amber-500 hover:text-black transition-colors font-bold">
+              📜 Rules
+            </button>
+            <button onClick={() => setSetupStep('MODE')} className="text-xs font-bold px-3 py-1 bg-rose-950/80 border border-rose-600/40 text-rose-300 hover:bg-rose-600 hover:text-white rounded-full uppercase tracking-widest transition-colors">
+              Exit
+            </button>
          </div>
       </div>
 
-      {/* GAME AREA */}
-      <div className="flex-1 flex items-center justify-center relative p-0 overflow-hidden perspective-board">
+      {/* CENTER BATTLEFIELD AREA (AUTO SCALES TO FIT AVAILABLE HEIGHT) */}
+      <div className="flex-1 min-h-0 w-full flex items-center justify-center relative p-2 overflow-hidden">
           {gameState.winner !== null && <ConfettiRain />}
           
-          <div className="transition-transform duration-500 w-full h-full flex items-center justify-center">
-            <Board gameState={gameState} onPieceClick={handlePieceClick} />
+          <div className="w-full h-full flex items-center justify-center">
+             <Board gameState={gameState} onPieceClick={handlePieceClick} />
           </div>
-          
+
           {/* Victory Modal */}
           {gameState.winner !== null && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
-              <div className="bg-[#1a0f0d] p-10 rounded-[2rem] text-center shadow-[0_0_50px_rgba(245,158,11,0.5)] border-2 border-amber-500 max-w-md w-full animate-[bounce_1s_ease-out]">
-                  <div className="text-6xl mb-4">👑</div>
-                  <h2 className="text-4xl font-display font-bold text-amber-400 mb-2">Victory!</h2>
-                  <p className="text-xl text-gray-300 mb-8">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-6">
+              <div className="bg-[#1a0f0d] p-8 rounded-[2rem] text-center shadow-[0_0_50px_rgba(245,158,11,0.6)] border-3 border-amber-500 max-w-sm w-full animate-[bounce_1s_ease-out]">
+                  <div className="text-5xl mb-3">👑</div>
+                  <h2 className="text-3xl font-display font-bold text-amber-400 mb-2">Victory!</h2>
+                  <p className="text-lg text-gray-300 mb-6">
                     <span className={`font-bold ${PLAYER_CONFIG[gameState.winner].text}`}>
                       {gameState.players[gameState.winner].name}
                     </span> claims the throne.
                   </p>
                   <button 
                     onClick={() => setSetupStep('MODE')}
-                    className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl text-lg hover:scale-105 transition-transform shadow-lg"
+                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl text-base hover:scale-105 transition-transform shadow-lg"
                   >
                     Play Again
                   </button>
@@ -575,160 +626,72 @@ export default function App() {
           )}
       </div>
 
-      {/* MOBILE BOTTOM CONTROLS */}
-      <div className="xl:hidden w-full bg-[#1a0f0d] pb-4 pt-2 px-3 rounded-t-[1.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.9)] z-40 border-t-2 border-[#5d4037] shrink-0">
-          <div className="flex items-center gap-3 h-20">
-               {/* Player Avatar */}
-               <div className={`
-                  w-14 h-14 rounded-2xl bg-gradient-to-br ${currentPlayer.gradient} 
-                  border-2 border-amber-500/50 shadow-lg flex flex-col items-center justify-center shrink-0 relative overflow-hidden
-               `}>
-                   <div className="text-xl relative z-10">{currentPlayer.isBot ? '🤖' : '👤'}</div>
-                   <div className="text-[8px] font-bold text-white uppercase mt-1 relative z-10 max-w-[50px] truncate">{currentPlayer.name}</div>
-               </div>
-
-               {/* Dice Module */}
-               <div className="flex-1 h-full flex items-center">
-                  <CowrieDice 
-                    value={gameState.lastDiceFace || 0} 
-                    rolling={gameState.isRolling} 
-                    onRoll={handleRoll}
-                    disabled={(gameState.diceValues.length > 0 && !gameState.awaitingBonusRoll) || currentPlayer.isBot} 
-                    canRoll={!gameState.winner && (gameState.diceValues.length === 0 || gameState.awaitingBonusRoll) && !currentPlayer.isBot}
-                    layout="horizontal"
-                    maxShells={gameState.boardSize === 5 ? 4 : 6}
-                  />
-               </div>
-          </div>
-          
-          {/* Moves Strip */}
-          <div className="h-8 mt-1 flex justify-center items-center gap-2">
-             {gameState.diceValues.length > 0 ? (
-                <div className="flex gap-2">
-                   {gameState.diceValues.map((v, i) => {
-                      const isSelected = gameState.selectedDieIndex === i;
-                      return (
-                        <button 
-                          key={i} 
-                          onClick={() => handleDiePillClick(i)}
-                          className={`font-bold px-3 py-1 rounded shadow-lg text-xs transition-all ${isSelected ? 'bg-amber-400 text-black ring-2 ring-white scale-110' : 'bg-amber-700 text-amber-100 hover:bg-amber-600'}`}
-                        >
-                          Move {v}
-                        </button>
-                      );
-                   })}
+      {/* BOTTOM UNIFIED GAME CONTROL DOCK (LOCKED FIXED HEIGHT, ZERO LAYOUT JUMPING) */}
+      <div className="w-full bg-[#1a0f0d] border-t-2 border-[#5d4037] px-4 py-2 z-40 shrink-0 h-24 sm:h-28 shadow-[0_-10px_30px_rgba(0,0,0,0.9)] flex items-center">
+         <div className="max-w-4xl mx-auto w-full flex items-center justify-between gap-3 h-full">
+             
+             {/* Left: Active Player Pill */}
+             <div className="flex items-center gap-2 shrink-0 min-w-[90px] sm:min-w-[140px]">
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${currentPlayer.gradient} border-2 border-amber-400 shadow-md flex items-center justify-center text-xl shrink-0`}>
+                   {currentPlayer.isBot ? '🤖' : '👤'}
                 </div>
-             ) : (
-                <span className="text-[10px] text-gray-400 uppercase tracking-widest">{gameState.isRolling ? 'Fates are turning...' : 'Waiting for roll...'}</span>
-             )}
-          </div>
-      </div>
-
-
-      {/* DESKTOP SIDEBAR LEFT */}
-      <div className="hidden xl:flex w-96 flex-col gap-6 z-20 h-[80vh] justify-center">
-        {/* Header */}
-        <div className="bg-[#2a1b15]/80 backdrop-blur-md p-8 rounded-[2rem] border border-[#5d4037] shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 text-8xl transition-transform group-hover:rotate-12">🎲</div>
-          
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-2">
-              <button onClick={toggleSound} className="text-xs px-3 py-1 bg-black/40 rounded-full border border-amber-500/30 text-amber-300 hover:bg-amber-500 hover:text-black transition-colors">
-                {isMuted ? '🔇 Muted' : '🔊 Sound On'}
-              </button>
-              <button onClick={() => setShowRulesModal(true)} className="text-xs px-3 py-1 bg-black/40 rounded-full border border-amber-500/30 text-amber-300 hover:bg-amber-500 hover:text-black transition-colors">
-                📜 Rules
-              </button>
-            </div>
-            <button onClick={() => setSetupStep('MODE')} className="text-xs font-bold text-amber-500/60 hover:text-amber-400 uppercase tracking-widest transition-colors">
-              Exit
-            </button>
-          </div>
-
-          <h1 className="text-4xl font-display font-bold text-amber-100 mt-2">
-            {gameState.boardSize === 5 ? 'Ashta Chamma' : 'Baara Katta'}
-          </h1>
-          <div className="text-sm text-amber-600 mt-2 uppercase tracking-widest font-bold">
-            Royal Court • {selectedMode.replace(/_/g, " ")} ({gameState.playerCount === 2 ? '1v1 Duel' : '4-Player Melee'})
-          </div>
-        </div>
-
-        {/* Player Control Card */}
-        <div className={`
-           p-8 rounded-[2rem] border-[3px] shadow-2xl transition-all duration-500 relative overflow-hidden
-           bg-[#1a0f0d]
-           ${currentPlayer.border}
-           ${currentPlayer.id === gameState.currentPlayerId ? 'shadow-[0_0_30px_rgba(0,0,0,0.5)] scale-105' : 'opacity-90'}
-        `}>
-          {/* Background Gradient */}
-          <div className={`absolute inset-0 bg-gradient-to-br ${currentPlayer.gradient} opacity-10`}></div>
-
-          <div className="flex items-center gap-5 mb-8 relative z-10">
-             <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${currentPlayer.gradient} border-4 border-[#1a0f0d] shadow-lg flex items-center justify-center text-3xl`}>
-                {currentPlayer.isBot ? '🤖' : '👤'}
+                <div className="hidden sm:block">
+                   <div className="text-[9px] text-amber-500/80 font-bold uppercase tracking-wider">Active Player</div>
+                   <div className="text-xs sm:text-sm font-bold text-white flex items-center gap-1">
+                      <span>{currentPlayer.name}</span>
+                      {!currentPlayer.isBot && <span className="text-[8px] bg-amber-400 text-black px-1.5 py-0.2 rounded font-extrabold">YOUR TURN</span>}
+                   </div>
+                </div>
              </div>
-             <div>
-               <div className="text-amber-500/80 text-xs uppercase tracking-[0.2em] font-bold mb-1">Active Player</div>
-               <div className={`font-display text-3xl font-bold text-white`}>{currentPlayer.name}</div>
+
+             {/* Middle: Cowrie Shells Dice Cup */}
+             <div className="flex-1 flex items-center justify-center h-full px-1">
+                <CowrieDice 
+                  value={gameState.lastDiceFace || 0} 
+                  rolling={gameState.isRolling} 
+                  onRoll={handleRoll}
+                  disabled={(gameState.diceValues.length > 0 && !gameState.awaitingBonusRoll) || currentPlayer.isBot} 
+                  canRoll={!gameState.winner && (gameState.diceValues.length === 0 || gameState.awaitingBonusRoll) && !currentPlayer.isBot}
+                  layout="horizontal"
+                  maxShells={gameState.boardSize === 5 ? 4 : 6}
+                  hideButton={true}
+                />
              </div>
-          </div>
 
-          <CowrieDice 
-            value={gameState.lastDiceFace || 0} 
-            rolling={gameState.isRolling} 
-            onRoll={handleRoll}
-            disabled={(gameState.diceValues.length > 0 && !gameState.awaitingBonusRoll) || currentPlayer.isBot} 
-            canRoll={!gameState.winner && (gameState.diceValues.length === 0 || gameState.awaitingBonusRoll) && !currentPlayer.isBot}
-            maxShells={gameState.boardSize === 5 ? 4 : 6}
-          />
-
-          {gameState.diceValues.length > 0 && (
-             <div className="mt-6 flex justify-center gap-3">
-               {gameState.diceValues.map((v, i) => {
-                 const isSelected = gameState.selectedDieIndex === i;
-                 return (
-                   <button 
-                    key={i} 
-                    onClick={() => handleDiePillClick(i)}
-                    className={`w-12 h-12 rounded-xl font-bold text-2xl flex items-center justify-center shadow-lg border-b-4 transition-all ${isSelected ? 'bg-amber-300 text-black border-amber-600 scale-110 ring-4 ring-amber-400' : 'bg-amber-500 text-[#2a1b15] border-amber-800 hover:scale-105'}`}
-                   >
-                     {v}
-                   </button>
-                 );
-               })}
+             {/* Right: In-Place Action Slot (Roll Button OR Move Choice Pills) */}
+             <div className="shrink-0 flex items-center justify-end w-[130px] sm:w-[180px] h-full">
+                {gameState.diceValues.length > 0 ? (
+                  /* Move Selection Pills replace Roll Button IN-PLACE */
+                  <div className="flex flex-col sm:flex-row gap-1.5 w-full">
+                     {gameState.diceValues.map((v, i) => {
+                       const isSelected = gameState.selectedDieIndex === i;
+                       return (
+                         <button 
+                           key={i} 
+                           onClick={() => handleDiePillClick(i)}
+                           className={`w-full py-3 sm:py-3.5 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider shadow-lg border-2 transition-all text-center ${isSelected ? 'bg-amber-300 text-black border-amber-600 ring-2 ring-white scale-105' : 'bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-400 hover:from-amber-400 hover:to-amber-500 animate-pulse-gold'}`}
+                         >
+                           Move {v}
+                         </button>
+                       );
+                     })}
+                  </div>
+                ) : (
+                  /* Roll Dice Button */
+                  <button
+                    onClick={handleRoll}
+                    disabled={gameState.winner !== null || currentPlayer.isBot || gameState.isRolling || (gameState.diceValues.length > 0 && !gameState.awaitingBonusRoll)}
+                    className={`w-full py-3 sm:py-3.5 rounded-xl font-display font-bold text-xs sm:text-sm uppercase tracking-widest shadow-xl border-2 transition-all text-center
+                      ${(!gameState.winner && !currentPlayer.isBot && (gameState.diceValues.length === 0 || gameState.awaitingBonusRoll)) 
+                        ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white border-amber-300 hover:from-amber-400 hover:to-amber-600 active:scale-95 animate-pulse-gold shadow-[0_0_20px_rgba(245,158,11,0.5)]' 
+                        : 'bg-gray-800/80 text-gray-500 border-gray-600 cursor-not-allowed grayscale'}
+                    `}
+                  >
+                    {gameState.isRolling ? 'Rolling...' : 'ROLL DICE'}
+                  </button>
+                )}
              </div>
-          )}
-        </div>
-      </div>
 
-      {/* DESKTOP SIDEBAR RIGHT (LOGS) */}
-      <div className="hidden xl:flex w-80 flex-col gap-4 h-[600px] z-20">
-         <div className="flex-1 bg-[#1a0f0d]/80 backdrop-blur-md p-6 rounded-[2rem] border border-[#5d4037] shadow-inner flex flex-col">
-            <h3 className="text-xs font-bold text-[#8d6e63] uppercase tracking-[0.2em] mb-4 border-b border-[#5d4037] pb-2">Chronicles</h3>
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
-                {gameState.logs.slice().reverse().map((log, i) => (
-                    <div key={i} className="text-sm text-gray-400 border-l-2 border-[#5d4037] pl-3 py-1 animate-fadeIn">
-                        {log}
-                    </div>
-                ))}
-            </div>
-         </div>
-         
-         {/* Simple Scoreboard */}
-         <div className="bg-[#2a1b15] p-5 rounded-[2rem] border border-[#5d4037]">
-            {gameState.players.filter(p => p.pieces.length > 0).map(p => {
-                 const finished = p.pieces.filter(pc => pc.status === PieceStatus.FINISHED).length;
-                 return (
-                     <div key={p.id} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
-                         <div className={`text-sm font-bold ${p.text}`}>{p.name}</div>
-                         <div className="flex gap-1">
-                            {Array.from({length: 4}).map((_, i) => (
-                                <div key={i} className={`w-2.5 h-2.5 rounded-full ${i < finished ? 'bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]' : 'bg-gray-800'}`}></div>
-                            ))}
-                         </div>
-                     </div>
-                 )
-            })}
          </div>
       </div>
 
