@@ -1,4 +1,5 @@
 import React from 'react';
+import { soundEngine } from '../utils/audio';
 
 interface CowrieDiceProps {
   value: number; 
@@ -121,7 +122,7 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({ value, rolling, onRoll, 
                {getLabel()}
              </div>
              <button
-              onClick={onRoll}
+              onClick={() => { soundEngine.playShellRoll(); onRoll(); }}
               disabled={disabled || !canRoll}
               className={`${buttonBaseClass} ${buttonStateClass} w-full py-2 text-xs`}
             >
@@ -155,7 +156,7 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({ value, rolling, onRoll, 
         </div>
         
         <button
-          onClick={onRoll}
+          onClick={() => { soundEngine.playShellRoll(); onRoll(); }}
           disabled={disabled || !canRoll}
           className={`${buttonBaseClass} ${buttonStateClass} w-full py-5 text-xl`}
         >

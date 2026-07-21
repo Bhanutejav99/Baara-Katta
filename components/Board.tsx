@@ -1,7 +1,7 @@
 import React from 'react';
 import { GameState, PieceStatus, PlayerId } from '../types';
-import { getPaths, PLAYER_CONFIG } from '../constants';
-import { isSafeSquare, canMovePiece } from '../utils/gameLogic';
+import { getPaths } from '../constants';
+import { getMovementPreview, isSafeSquare, canMovePiece } from '../utils/gameLogic';
 
 interface BoardProps {
   gameState: GameState;
@@ -84,91 +84,100 @@ const CenterIcon = () => (
     </div>
 );
 
-// --- TRAY COMPONENT ---
+// Start Cell Helper
+const getStartPlayerForTile = (r: number, c: number, boardSize: number): PlayerId | null => {
+  if (boardSize === 5) {
+    if (r === 4 && c === 2) return PlayerId.P1;
+    if (r === 2 && c === 4) return PlayerId.P2;
+    if (r === 0 && c === 2) return PlayerId.P3;
+    if (r === 2 && c === 0) return PlayerId.P4;
+  } else {
+    if (r === 6 && c === 3) return PlayerId.P1;
+    if (r === 3 && c === 6) return PlayerId.P2;
+    if (r === 0 && c === 3) return PlayerId.P3;
+    if (r === 3 && c === 0) return PlayerId.P4;
+  }
+  return null;
+};
+
+// --- LUDO STYLE HOME TRAY COMPONENT ---
 
 const HomeTray = ({ 
   playerIdx, 
   gameState, 
   onPieceClick, 
-  orientation,
   styleClass 
 }: { 
   playerIdx: PlayerId, 
   gameState: GameState, 
   onPieceClick: any, 
-  orientation: 'vertical' | 'horizontal',
   styleClass: string
 }) => {
   const player = gameState.players[playerIdx];
+  if (!player || !player.pieces || player.pieces.length === 0) return null;
+
   const homePieces = player.pieces.filter(p => p.status === PieceStatus.HOME);
   const isCurrentPlayerTurn = gameState.currentPlayerId === playerIdx;
   
-  // Tray Materials
-  const trayColors = [
-    'bg-[#450a0a] border-[#991b1b]', // Red
-    'bg-[#064e3b] border-[#065f46]', // Green
-    'bg-[#451a03] border-[#92400e]', // Yellow (Brownish Gold base)
-    'bg-[#172554] border-[#1e40af]'  // Blue
+  const trayThemes = [
+    { bg: 'bg-[#450a0a]', border: 'border-red-600', ring: 'ring-red-400', badge: 'bg-red-900/90 text-red-200' },
+    { bg: 'bg-[#064e3b]', border: 'border-emerald-600', ring: 'ring-emerald-400', badge: 'bg-emerald-900/90 text-emerald-200' },
+    { bg: 'bg-[#451a03]', border: 'border-amber-500', ring: 'ring-amber-400', badge: 'bg-amber-900/90 text-amber-200' },
+    { bg: 'bg-[#172554]', border: 'border-blue-600', ring: 'ring-blue-400', badge: 'bg-blue-900/90 text-blue-200' }
   ];
 
-  // Adjust container dimensions to allow more space for pawns
-  const containerClass = orientation === 'vertical' 
-    ? 'flex flex-col-reverse items-center justify-center py-2 w-12 md:w-20 min-h-[140px] md:min-h-[180px]' 
-    : 'flex flex-row items-center justify-center px-2 h-12 md:h-20 min-w-[140px] md:min-w-[180px]';
+  const theme = trayThemes[playerIdx];
 
-  // Significantly reduced negative spacing to show pawn heads clearly
-  const spacingClass = orientation === 'vertical' ? '-space-y-3' : '-space-x-3';
-  
   return (
     <div className={`
         absolute ${styleClass} 
-        ${trayColors[playerIdx]}
-        border-[3px] rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.6)] 
-        transition-all duration-500
-        ${isCurrentPlayerTurn ? 'scale-105 ring-2 ring-amber-400 z-30 brightness-110' : 'opacity-90 scale-100 grayscale-[0.2]'}
+        ${theme.bg} ${theme.border}
+        border-[3px] rounded-2xl shadow-[0_12px_28px_rgba(0,0,0,0.8)] 
+        transition-all duration-300 p-2 md:p-3
+        ${isCurrentPlayerTurn ? `scale-105 ring-4 ${theme.ring} z-30 brightness-110 shadow-[0_0_25px_rgba(245,158,11,0.5)]` : 'opacity-90 scale-100 grayscale-[0.15]'}
     `}>
-       {/* Inset Tray Depth */}
-       <div className="absolute inset-2 bg-black/30 rounded-lg shadow-inner pointer-events-none"></div>
+       {/* Inset Wooden Slot Frame */}
+       <div className="absolute inset-1 bg-black/40 rounded-xl shadow-inner pointer-events-none"></div>
 
-       {/* Player Label */}
-       <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[9px] md:text-[10px] px-2 py-0.5 rounded-full border border-white/20 uppercase tracking-widest whitespace-nowrap z-40">
-           {player.name}
+       {/* Player Title & Turn Badge */}
+       <div className={`absolute -top-3.5 left-1/2 -translate-x-1/2 ${theme.badge} border border-white/20 text-[9px] md:text-[11px] font-bold px-3 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap z-40 shadow-md flex items-center gap-1.5`}>
+           <span>{player.name}</span>
+           {isCurrentPlayerTurn && <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>}
        </div>
 
-       <div className={`relative z-10 ${containerClass} ${spacingClass}`}>
-          {homePieces.map((p, i) => {
-             const isCurrentPlayer = gameState.currentPlayerId === p.owner;
-             const isMovable = isCurrentPlayer && gameState.diceValues.some(val => canMovePiece(gameState, p, val));
-
-             // Correct Z-Index logic:
-             // Lower index (visually lower) should be ON TOP so its head is visible.
-             const zStyle = orientation === 'vertical' ? { zIndex: 20 - i } : { zIndex: i };
+       {/* 4 Dedicated Circular Pawn Slots */}
+       <div className="relative z-10 grid grid-cols-2 gap-1.5 md:gap-2.5 items-center justify-items-center">
+          {Array.from({ length: 4 }).map((_, slotIdx) => {
+             const piece = homePieces[slotIdx];
+             const isMovable = piece && isCurrentPlayerTurn && gameState.diceValues.some(val => canMovePiece(gameState, piece, val));
 
              return (
-               <button
-                  key={i}
-                  onClick={(e) => {
-                     e.stopPropagation();
-                     onPieceClick(p.owner, p.id);
-                  }}
-                  style={zStyle}
-                  className={`relative w-8 h-8 md:w-14 md:h-14 transition-all duration-300
-                     ${isMovable ? 'animate-bounce cursor-pointer brightness-125 drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : ''}
-                     hover:scale-110
-                  `}
+               <div 
+                 key={slotIdx} 
+                 className="w-8 h-8 md:w-11 md:h-11 rounded-full bg-black/50 border border-white/15 flex items-center justify-center relative shadow-inner"
                >
-                  <PawnIcon playerIdx={playerIdx} />
-               </button>
-             )
+                 {piece ? (
+                   <button
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       onPieceClick(piece.owner, piece.id);
+                     }}
+                     className={`w-full h-full transition-all duration-300 flex items-center justify-center
+                       ${isMovable ? 'animate-bounce cursor-pointer scale-110 brightness-125 drop-shadow-[0_0_10px_rgba(255,215,0,0.8)]' : 'hover:scale-105'}
+                     `}
+                   >
+                     <PawnIcon playerIdx={playerIdx} />
+                   </button>
+                 ) : (
+                   <div className="w-2.5 h-2.5 rounded-full bg-white/10"></div>
+                 )}
+               </div>
+             );
           })}
-          
-          {homePieces.length === 0 && (
-             <div className="text-white/20 text-xl">✓</div>
-          )}
        </div>
     </div>
-  )
-}
+  );
+};
 
 // --- MAIN BOARD ---
 
@@ -176,6 +185,30 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
   const { boardSize } = gameState;
   const paths = getPaths(boardSize);
   const centerIndex = Math.floor(boardSize / 2);
+
+  const currentPlayer = gameState.players[gameState.currentPlayerId];
+  const activePreviews: { r: number; c: number; isSafe: boolean; isCapture: boolean; isFinish: boolean }[] = [];
+
+  if (currentPlayer && !currentPlayer.isBot && gameState.diceValues.length > 0) {
+    const diceToUse = (gameState.selectedDieIndex !== null && gameState.selectedDieIndex !== undefined && gameState.diceValues[gameState.selectedDieIndex] !== undefined)
+      ? [gameState.diceValues[gameState.selectedDieIndex]]
+      : gameState.diceValues;
+
+    currentPlayer.pieces.forEach(p => {
+      diceToUse.forEach(die => {
+        const prev = getMovementPreview(gameState, p, die);
+        if (prev && prev.targetCoords) {
+          activePreviews.push({
+            r: prev.targetCoords.r,
+            c: prev.targetCoords.c,
+            isSafe: prev.isSafe,
+            isCapture: prev.isCapture,
+            isFinish: prev.isFinish
+          });
+        }
+      });
+    });
+  }
 
   const getCellContent = (r: number, c: number) => {
     return gameState.players.flatMap(player => 
@@ -232,12 +265,23 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
           const pieces = getCellContent(r, c);
           const isSafeSpot = isSafe(r, c);
           const isCenterSpot = isCenter(r, c);
+          const startPlayer = getStartPlayerForTile(r, c, boardSize);
+          
+          const previewMatch = activePreviews.find(p => p.r === r && p.c === c);
 
           // Tile Styling
           let bgClass = "bg-[#eaddcf]"; // Ivory
           
           if (isCenterSpot) {
              bgClass = "bg-[#2a1b15]"; // Dark hole for center
+          } else if (startPlayer === PlayerId.P1) {
+             bgClass = "bg-rose-900/35"; // Red start
+          } else if (startPlayer === PlayerId.P2) {
+             bgClass = "bg-emerald-900/35"; // Green start
+          } else if (startPlayer === PlayerId.P3) {
+             bgClass = "bg-amber-900/35"; // Yellow start
+          } else if (startPlayer === PlayerId.P4) {
+             bgClass = "bg-blue-900/35"; // Blue start
           } else if (isSafeSpot) {
              bgClass = "bg-[#d7ccc8]"; // Darker Ivory
           } else if ((r + c) % 2 !== 0) {
@@ -255,8 +299,24 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
               {/* Tile Bevel */}
               <div className="absolute inset-0 border-[1px] border-white/40 border-b-black/10 border-r-black/10 pointer-events-none"></div>
               
+              {/* Player Start Star Badge */}
+              {startPlayer !== null && (
+                <div className="absolute bottom-0.5 left-0.5 text-[9px] opacity-70 pointer-events-none">
+                  {startPlayer === PlayerId.P1 ? '🔴' : startPlayer === PlayerId.P2 ? '🟢' : startPlayer === PlayerId.P3 ? '🟡' : '🔵'}
+                </div>
+              )}
+
               {isSafeSpot && !isCenterSpot && <SafeIcon />}
               {isCenterSpot && <CenterIcon />}
+
+              {/* Target Square Landing Preview Glow */}
+              {previewMatch && (
+                <div className={`absolute inset-0 border-2 ${previewMatch.isCapture ? 'border-red-500 bg-red-500/20' : previewMatch.isFinish ? 'border-amber-400 bg-amber-400/30' : 'border-emerald-400 bg-emerald-400/20'} animate-pulse rounded z-0 flex items-center justify-center`}>
+                  <div className="text-[10px] font-bold px-1 rounded bg-black/70 text-amber-300 absolute top-0.5 right-0.5 z-20 pointer-events-none">
+                    {previewMatch.isCapture ? '⚔️' : previewMatch.isFinish ? '👑' : '🎯'}
+                  </div>
+                </div>
+              )}
 
               {/* Pieces */}
               <div className={`grid ${gridClass} w-full h-full p-0.5 items-center justify-items-center z-10 gap-0.5`}>
@@ -292,37 +352,33 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
         })}
       </div>
 
-      {/* Home Trays Positioned around Board with slightly tighter offsets for mobile */}
+      {/* Home Trays Positioned around Board */}
       <HomeTray 
         playerIdx={PlayerId.P1} 
         gameState={gameState} 
         onPieceClick={onPieceClick} 
-        orientation="horizontal"
-        styleClass="bottom-[-2.5rem] md:bottom-[-2rem] left-1/2 -translate-x-1/2" 
+        styleClass="bottom-[-3.6rem] md:bottom-[-4.2rem] left-1/2 -translate-x-1/2" 
       />
       
       <HomeTray 
         playerIdx={PlayerId.P2} 
         gameState={gameState} 
         onPieceClick={onPieceClick} 
-        orientation="vertical"
-        styleClass="right-[-1.25rem] md:right-[-2rem] top-1/2 -translate-y-1/2" 
+        styleClass="right-[-3.6rem] md:right-[-4.2rem] top-1/2 -translate-y-1/2" 
       />
       
       <HomeTray 
         playerIdx={PlayerId.P3} 
         gameState={gameState} 
         onPieceClick={onPieceClick} 
-        orientation="horizontal"
-        styleClass="top-[-2.5rem] md:top-[-2rem] left-1/2 -translate-x-1/2" 
+        styleClass="top-[-3.6rem] md:top-[-4.2rem] left-1/2 -translate-x-1/2" 
       />
       
       <HomeTray 
         playerIdx={PlayerId.P4} 
         gameState={gameState} 
         onPieceClick={onPieceClick} 
-        orientation="vertical"
-        styleClass="left-[-1.25rem] md:left-[-2rem] top-1/2 -translate-y-1/2" 
+        styleClass="left-[-3.6rem] md:left-[-4.2rem] top-1/2 -translate-y-1/2" 
       />
 
     </div>

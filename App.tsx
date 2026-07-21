@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { GameState, PlayerId, Piece, PieceStatus, Player, GameMode } from './types';
+import { GameState, PlayerId, Piece, PieceStatus, Player, GameMode, BotDifficulty } from './types';
 import { PLAYER_CONFIG } from './constants';
 import { canMovePiece, movePiece, getBotMove } from './utils/gameLogic';
 import { Board } from './components/Board';
 import { CowrieDice } from './components/CowrieDice';
+import { RulesModal } from './components/RulesModal';
+import { soundEngine } from './utils/audio';
 
 // --- INITIAL DATA & TYPES ---
 
@@ -14,7 +16,14 @@ const INITIAL_PIECES: Piece[] = Array.from({ length: 4 }).map((_, i) => ({
   pathIndex: -1
 }));
 
-const createPlayers = (mode: GameMode): Player[] => {
+const getNextPlayerId = (currentId: PlayerId, playerCount: 2 | 4): PlayerId => {
+  if (playerCount === 2) {
+    return currentId === PlayerId.P1 ? PlayerId.P3 : PlayerId.P1;
+  }
+  return ((currentId + 1) % 4) as PlayerId;
+};
+
+const createPlayers = (mode: GameMode, difficulty: BotDifficulty, playerCount: 2 | 4 = 2): Player[] => {
   const basePlayers: Player[] = [
     { id: PlayerId.P1, ...PLAYER_CONFIG[PlayerId.P1], pieces: [], hasKilled: false, isBot: false },
     { id: PlayerId.P2, ...PLAYER_CONFIG[PlayerId.P2], pieces: [], hasKilled: false, isBot: false },
@@ -22,14 +31,27 @@ const createPlayers = (mode: GameMode): Player[] => {
     { id: PlayerId.P4, ...PLAYER_CONFIG[PlayerId.P4], pieces: [], hasKilled: false, isBot: false },
   ];
 
+  // Active player IDs: 2-player uses P1 (Red - Bottom) and P3 (Yellow - Top) for classic opposite balance
+  const activeIds = playerCount === 2 ? [PlayerId.P1, PlayerId.P3] : [PlayerId.P1, PlayerId.P2, PlayerId.P3, PlayerId.P4];
+
   basePlayers.forEach(p => {
-    p.pieces = JSON.parse(JSON.stringify(INITIAL_PIECES)).map((piece: Piece) => ({ ...piece, owner: p.id }));
+    if (activeIds.includes(p.id)) {
+      p.pieces = JSON.parse(JSON.stringify(INITIAL_PIECES)).map((piece: Piece) => ({ ...piece, owner: p.id }));
+    } else {
+      p.pieces = [];
+    }
   });
 
   if (mode === GameMode.VS_COMPUTER) {
-    basePlayers[1].isBot = true; basePlayers[1].name = "Maharaja Bot";
-    basePlayers[2].isBot = true; basePlayers[2].name = "Minister Bot";
-    basePlayers[3].isBot = true; basePlayers[3].name = "Guard Bot";
+    const diffPrefix = difficulty === BotDifficulty.EMPEROR ? "Emperor" : difficulty === BotDifficulty.NOVICE ? "Courtier" : "General";
+    if (playerCount === 2) {
+      basePlayers[PlayerId.P3].isBot = true; 
+      basePlayers[PlayerId.P3].name = `Maharaja (${diffPrefix})`;
+    } else {
+      basePlayers[PlayerId.P2].isBot = true; basePlayers[PlayerId.P2].name = `Maharaja (${diffPrefix})`;
+      basePlayers[PlayerId.P3].isBot = true; basePlayers[PlayerId.P3].name = `Minister (${diffPrefix})`;
+      basePlayers[PlayerId.P4].isBot = true; basePlayers[PlayerId.P4].name = `Guard (${diffPrefix})`;
+    }
   } else if (mode === GameMode.ONLINE_RANDOM) {
     basePlayers[1].isBot = true; basePlayers[1].name = "Player 2";
     basePlayers[2].isBot = true; basePlayers[2].name = "Player 3";
@@ -43,17 +65,26 @@ const createPlayers = (mode: GameMode): Player[] => {
   return basePlayers;
 };
 
-const INITIAL_STATE = (size: 5 | 7, mode: GameMode): GameState => ({
+const INITIAL_STATE = (
+  size: 5 | 7, 
+  mode: GameMode, 
+  difficulty: BotDifficulty = BotDifficulty.STRATEGIST,
+  playerCount: 2 | 4 = 2
+): GameState => ({
   boardSize: size,
-  players: createPlayers(mode),
+  playerCount: playerCount,
+  players: createPlayers(mode, difficulty, playerCount),
   currentPlayerId: PlayerId.P1,
   diceValues: [],
+  selectedDieIndex: null,
+  selectedPiece: null,
   isRolling: false,
   winner: null,
   logs: ["Game Started. Red to move."],
   lastDiceFace: null,
   awaitingBonusRoll: false,
-  gameMode: mode
+  gameMode: mode,
+  botDifficulty: difficulty
 });
 
 // --- HELPER COMPONENT: CONFETTI ---
@@ -121,17 +152,26 @@ const ModeButton: React.FC<ModeButtonProps> = ({ icon, title, desc, onClick }) =
 // --- MAIN APP COMPONENT ---
 
 export default function App() {
-  const [setupStep, setSetupStep] = useState<'MODE' | 'SIZE' | 'LOBBY' | 'GAME'>('MODE');
+  const [setupStep, setSetupStep] = useState<'MODE' | 'OPPONENTS' | 'DIFFICULTY' | 'SIZE' | 'LOBBY' | 'GAME'>('MODE');
   const [selectedMode, setSelectedMode] = useState<GameMode>(GameMode.PASS_N_PLAY);
+  const [selectedPlayerCount, setSelectedPlayerCount] = useState<2 | 4>(2); // Default 1vs1 (2 Players)
+  const [selectedDifficulty, setSelectedDifficulty] = useState<BotDifficulty>(BotDifficulty.STRATEGIST);
   const [roomCode, setRoomCode] = useState("");
-  const [gameState, setGameState] = useState<GameState>(INITIAL_STATE(7, GameMode.PASS_N_PLAY));
+  const [isMuted, setIsMuted] = useState(soundEngine.getMuted());
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [gameState, setGameState] = useState<GameState>(INITIAL_STATE(7, GameMode.PASS_N_PLAY, BotDifficulty.STRATEGIST, 2));
 
   // Bot Logic Timers
   const botRollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const botMoveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const toggleSound = () => {
+    const muted = soundEngine.toggleMute();
+    setIsMuted(muted);
+  };
+
   const startGame = (size: 5 | 7) => {
-    setGameState(INITIAL_STATE(size, selectedMode));
+    setGameState(INITIAL_STATE(size, selectedMode, selectedDifficulty, selectedPlayerCount));
     setSetupStep('GAME');
   };
 
@@ -143,30 +183,26 @@ export default function App() {
 
     setGameState(prev => ({ ...prev, isRolling: true, awaitingBonusRoll: false }));
 
-    // Sound effect trigger would go here
     setTimeout(() => {
       const maxShells = gameState.boardSize === 5 ? 4 : 6;
-      // Randomly decide how many shells fall open (face up)
       const openShells = Math.floor(Math.random() * (maxShells + 1)); 
       
       let value = openShells;
       
       if (maxShells === 4) {
-          // Ashta Chamma Logic
           if (value === 0) value = 8;
       } else {
-          // Baara Katta Logic (6 shells)
-          if (value === 0) value = 12; // Baara (12)
-          // Note: if value is 6, it stays 6 (Katta)
+          if (value === 0) value = 12;
       }
       
-      // Determine Bonus Turn
-      // 5x5: 4 or 8
-      // 7x7: 6 or 12
       const isExtraTurn = (maxShells === 4 && (value === 4 || value === 8)) ||
                           (maxShells === 6 && (value === 6 || value === 12));
 
       const playerName = gameState.players[gameState.currentPlayerId].name;
+
+      if (isExtraTurn) {
+        soundEngine.playBonus();
+      }
 
       setGameState(prev => {
         const newDiceValues = [...prev.diceValues, value];
@@ -189,14 +225,50 @@ export default function App() {
     if (gameState.winner || gameState.currentPlayerId !== ownerId) return;
     if (gameState.players[gameState.currentPlayerId].isBot) return;
 
-    const validDieIndex = gameState.diceValues.findIndex(val => 
-      canMovePiece(gameState, gameState.players[ownerId].pieces[pieceIdx], val)
-    );
+    let validDieIndex = -1;
 
-    if (validDieIndex === -1) return; // Add shake animation logic here later
+    if (gameState.selectedDieIndex !== null && gameState.diceValues[gameState.selectedDieIndex] !== undefined) {
+      const selectedVal = gameState.diceValues[gameState.selectedDieIndex];
+      if (canMovePiece(gameState, gameState.players[ownerId].pieces[pieceIdx], selectedVal)) {
+        validDieIndex = gameState.selectedDieIndex;
+      }
+    }
+
+    if (validDieIndex === -1) {
+      validDieIndex = gameState.diceValues.findIndex(val => 
+        canMovePiece(gameState, gameState.players[ownerId].pieces[pieceIdx], val)
+      );
+    }
+
+    if (validDieIndex === -1) {
+      soundEngine.playError();
+      return;
+    }
 
     const steps = gameState.diceValues[validDieIndex];
-    setGameState(prev => movePiece(prev, pieceIdx, steps));
+    
+    setGameState(prev => {
+      const nextState = movePiece(prev, pieceIdx, steps);
+      nextState.selectedDieIndex = null;
+
+      if (nextState.winner !== null) {
+        soundEngine.playVictory();
+      } else if (nextState.awaitingBonusRoll) {
+        soundEngine.playBonus();
+      } else {
+        soundEngine.playMove();
+      }
+
+      return nextState;
+    });
+  };
+
+  const handleDiePillClick = (index: number) => {
+    soundEngine.playSelect();
+    setGameState(prev => ({
+      ...prev,
+      selectedDieIndex: prev.selectedDieIndex === index ? null : index
+    }));
   };
 
   // Bot Loop
@@ -205,18 +277,28 @@ export default function App() {
 
     const currentPlayer = gameState.players[gameState.currentPlayerId];
     
-    if (currentPlayer.isBot) {
+    if (currentPlayer && currentPlayer.isBot) {
         if (gameState.diceValues.length === 0 || gameState.awaitingBonusRoll) {
             if (!gameState.isRolling) {
-                botRollTimer.current = setTimeout(handleRoll, 1500);
+                botRollTimer.current = setTimeout(handleRoll, 1200);
             }
         } else if (gameState.diceValues.length > 0 && !gameState.isRolling) {
             botMoveTimer.current = setTimeout(() => {
                 const bestMove = getBotMove(gameState);
                 if (bestMove) {
-                   setGameState(prev => movePiece(prev, bestMove.pieceIndex, bestMove.diceValue));
+                   setGameState(prev => {
+                     const nextState = movePiece(prev, bestMove.pieceIndex, bestMove.diceValue);
+                     if (nextState.winner !== null) {
+                       soundEngine.playVictory();
+                     } else if (nextState.awaitingBonusRoll) {
+                       soundEngine.playBonus();
+                     } else {
+                       soundEngine.playMove();
+                     }
+                     return nextState;
+                   });
                 }
-            }, 1500);
+            }, 1200);
         }
     }
     return () => {
@@ -230,7 +312,6 @@ export default function App() {
     if (setupStep !== 'GAME' || gameState.winner) return;
 
     if (gameState.diceValues.length === 0 && !gameState.isRolling && !gameState.awaitingBonusRoll) {
-       // Check if last roll was a bonus roll
        const lastVal = gameState.lastDiceFace;
        const isSize5 = gameState.boardSize === 5;
        const isBonus = isSize5 ? (lastVal === 4 || lastVal === 8) : (lastVal === 6 || lastVal === 12);
@@ -238,15 +319,16 @@ export default function App() {
        if (!isBonus && lastVal !== null) {
          const timer = setTimeout(() => {
             setGameState(prev => {
-                const nextId = (prev.currentPlayerId + 1) % 4;
+                const nextId = getNextPlayerId(prev.currentPlayerId, prev.playerCount);
                 return {
                     ...prev,
                     currentPlayerId: nextId,
                     lastDiceFace: null, 
+                    selectedDieIndex: null,
                     logs: [...prev.logs, `Turn: ${prev.players[nextId].name}`]
                 };
             });
-         }, 1000);
+         }, 800);
          return () => clearTimeout(timer);
        }
     }
@@ -254,28 +336,30 @@ export default function App() {
     // Stuck Check
     if (gameState.diceValues.length > 0 && !gameState.awaitingBonusRoll && !gameState.isRolling) {
       const currentPlayer = gameState.players[gameState.currentPlayerId];
-      const hasValidMove = currentPlayer.pieces.some(p => 
-        gameState.diceValues.some(val => canMovePiece(gameState, p, val))
-      );
+      if (currentPlayer && currentPlayer.pieces.length > 0) {
+        const hasValidMove = currentPlayer.pieces.some(p => 
+          gameState.diceValues.some(val => canMovePiece(gameState, p, val))
+        );
 
-      if (!hasValidMove) {
-         const timer = setTimeout(() => {
-          setGameState(prev => {
-             const nextId = (prev.currentPlayerId + 1) % 4;
-             return {
-              ...prev,
-              diceValues: [],
-              lastDiceFace: null, 
-              currentPlayerId: nextId,
-              logs: [...prev.logs, `No moves possible. Skipping turn.`, `Turn: ${prev.players[nextId].name}`]
-             };
-          });
-         }, 2000);
-         return () => clearTimeout(timer);
+        if (!hasValidMove) {
+           const timer = setTimeout(() => {
+            setGameState(prev => {
+               const nextId = getNextPlayerId(prev.currentPlayerId, prev.playerCount);
+               return {
+                ...prev,
+                diceValues: [],
+                lastDiceFace: null, 
+                selectedDieIndex: null,
+                currentPlayerId: nextId,
+                logs: [...prev.logs, `No moves possible for ${currentPlayer.name}. Skipping turn.`, `Turn: ${prev.players[nextId].name}`]
+               };
+            });
+           }, 1800);
+           return () => clearTimeout(timer);
+        }
       }
     }
   }, [gameState.diceValues, gameState.isRolling, gameState.winner, gameState.currentPlayerId, gameState.lastDiceFace, gameState.awaitingBonusRoll, setupStep, gameState.boardSize]);
-
 
   // --- VIEW STATES ---
 
@@ -284,23 +368,97 @@ export default function App() {
         <MenuCard title="Baara Katta">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <ModeButton 
-                    onClick={() => { setSelectedMode(GameMode.VS_COMPUTER); setSetupStep('SIZE'); }}
+                    onClick={() => { setSelectedMode(GameMode.VS_COMPUTER); setSetupStep('OPPONENTS'); }}
                     icon="🤖" title="Vs Computer" desc="Sharpen your skills against royal AI opponents."
                 />
                 <ModeButton 
-                    onClick={() => { setSelectedMode(GameMode.PASS_N_PLAY); setSetupStep('SIZE'); }}
+                    onClick={() => { setSelectedMode(GameMode.PASS_N_PLAY); setSelectedPlayerCount(2); setSetupStep('SIZE'); }}
                     icon="👥" title="Pass & Play" desc="Classic fun on a single device with friends."
                 />
                 <ModeButton 
-                    onClick={() => { setSelectedMode(GameMode.ONLINE_FRIENDS); setSetupStep('LOBBY'); }}
+                    onClick={() => { setSelectedMode(GameMode.ONLINE_FRIENDS); setSelectedPlayerCount(4); setSetupStep('LOBBY'); }}
                     icon="⚔️" title="Play Online" desc="Challenge friends or meet new rivals."
                 />
                 <ModeButton 
-                    onClick={() => { setSelectedMode(GameMode.ONLINE_RANDOM); setSetupStep('SIZE'); }}
+                    onClick={() => { setSelectedMode(GameMode.ONLINE_RANDOM); setSelectedPlayerCount(4); setSetupStep('SIZE'); }}
                     icon="🌍" title="Global Match" desc="Ranked matches against the world."
                 />
             </div>
+            
+            <div className="mt-8 flex justify-center gap-4 text-xs font-bold text-amber-500/80">
+              <button onClick={() => setShowRulesModal(true)} className="hover:text-amber-300 flex items-center gap-1 uppercase tracking-wider">
+                📜 How to Play & Rules
+              </button>
+            </div>
+
+            <RulesModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} />
         </MenuCard>
+    );
+  }
+
+  if (setupStep === 'OPPONENTS') {
+    return (
+      <MenuCard title="Select Opponent Mode" onBack={() => setSetupStep('MODE')}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+          <button 
+            onClick={() => { setSelectedPlayerCount(2); setSetupStep('DIFFICULTY'); }}
+            className="group relative p-8 rounded-3xl bg-gradient-to-br from-[#2a1b15] to-[#1a0f0d] border-2 border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:border-amber-400 text-left transition-all hover:-translate-y-1"
+          >
+            <div className="absolute top-4 right-4 bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+              Default
+            </div>
+            <div className="text-4xl mb-3">⚔️</div>
+            <div className="text-2xl font-bold text-amber-200 font-display mb-1">1 vs 1 Duel</div>
+            <div className="text-amber-400 font-bold text-xs uppercase tracking-wider mb-2">2 Players</div>
+            <div className="text-xs text-gray-400 leading-relaxed">Fast-paced 1-on-1 match against 1 Maharaja AI opponent.</div>
+          </button>
+
+          <button 
+            onClick={() => { setSelectedPlayerCount(4); setSetupStep('DIFFICULTY'); }}
+            className="group relative p-8 rounded-3xl bg-gradient-to-br from-[#2a1b15] to-[#1a0f0d] border-2 border-[#5d4037] hover:border-amber-500 text-left transition-all hover:-translate-y-1"
+          >
+            <div className="text-4xl mb-3">👑</div>
+            <div className="text-2xl font-bold text-amber-200 font-display mb-1">1 vs 3 Royal Melee</div>
+            <div className="text-amber-400 font-bold text-xs uppercase tracking-wider mb-2">4 Players</div>
+            <div className="text-xs text-gray-400 leading-relaxed">Full court battle royale against 3 AI opponents.</div>
+          </button>
+        </div>
+      </MenuCard>
+    );
+  }
+
+  if (setupStep === 'DIFFICULTY') {
+    return (
+      <MenuCard title="Select AI Difficulty" onBack={() => setSetupStep('OPPONENTS')}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+          <button 
+            onClick={() => { setSelectedDifficulty(BotDifficulty.NOVICE); setSetupStep('SIZE'); }}
+            className="p-6 rounded-2xl bg-[#2a1b15] border-2 border-[#5d4037] hover:border-amber-500 text-left transition-all hover:-translate-y-1"
+          >
+            <div className="text-3xl mb-2">🌱</div>
+            <div className="text-xl font-bold text-amber-200 font-display">Novice Courtier</div>
+            <div className="text-xs text-gray-400 mt-2">Casual, relaxed play for beginners.</div>
+          </button>
+
+          <button 
+            onClick={() => { setSelectedDifficulty(BotDifficulty.STRATEGIST); setSetupStep('SIZE'); }}
+            className="p-6 rounded-2xl bg-[#2a1b15] border-2 border-amber-500/60 hover:border-amber-400 text-left transition-all hover:-translate-y-1 shadow-lg"
+          >
+            <div className="text-3xl mb-2">⚔️</div>
+            <div className="text-xl font-bold text-amber-300 font-display">Royal General</div>
+            <div className="text-xs text-gray-400 mt-2">Tactical balance of capture and defense.</div>
+          </button>
+
+          <button 
+            onClick={() => { setSelectedDifficulty(BotDifficulty.EMPEROR); setSetupStep('SIZE'); }}
+            className="p-6 rounded-2xl bg-[#2a1b15] border-2 border-rose-500/60 hover:border-rose-400 text-left transition-all hover:-translate-y-1"
+          >
+            <div className="text-3xl mb-2">👑</div>
+            <div className="text-xl font-bold text-rose-300 font-display">Grand Emperor</div>
+            <div className="text-xs text-gray-400 mt-2">Relentless, highly aggressive AI master.</div>
+          </button>
+        </div>
+      </MenuCard>
     );
   }
 
@@ -328,7 +486,7 @@ export default function App() {
 
   if (setupStep === 'SIZE') {
     return (
-      <MenuCard title="Select Battlefield" onBack={() => setSetupStep('MODE')}>
+      <MenuCard title="Select Battlefield" onBack={() => setSetupStep(selectedMode === GameMode.VS_COMPUTER ? 'DIFFICULTY' : 'MODE')}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl mx-auto">
             <button 
               onClick={() => startGame(5)}
@@ -338,7 +496,7 @@ export default function App() {
                 <div className="absolute bottom-0 left-0 right-0 p-6 z-20 text-left">
                     <div className="text-5xl font-display font-bold text-white mb-2">5x5</div>
                     <div className="text-amber-400 font-bold uppercase tracking-wider">Ashta Chamma</div>
-                    <div className="text-gray-400 text-sm mt-2">Fast paced • High conflict</div>
+                    <div className="text-gray-400 text-sm mt-2">Fast paced • High conflict • 4 Shells</div>
                 </div>
             </button>
 
@@ -350,7 +508,7 @@ export default function App() {
                 <div className="absolute bottom-0 left-0 right-0 p-6 z-20 text-left">
                     <div className="text-5xl font-display font-bold text-white mb-2">7x7</div>
                     <div className="text-amber-400 font-bold uppercase tracking-wider">Baara Katta</div>
-                    <div className="text-gray-400 text-sm mt-2">Strategic • Long format</div>
+                    <div className="text-gray-400 text-sm mt-2">Strategic • Long format • 6 Shells</div>
                 </div>
             </button>
           </div>
@@ -365,11 +523,20 @@ export default function App() {
       
       {/* MOBILE HEADER */}
       <div className="xl:hidden flex justify-between items-center px-4 py-2 bg-[#2a1b15]/90 backdrop-blur-md border-b border-[#5d4037] z-30 shrink-0 shadow-lg h-14">
-         <button onClick={() => setSetupStep('MODE')} className="text-[10px] font-bold text-amber-500/80 border border-amber-500/30 px-3 py-1 rounded-full uppercase tracking-wider">
-            Surrender
-         </button>
+         <div className="flex items-center gap-2">
+            <button onClick={() => setSetupStep('MODE')} className="text-[10px] font-bold text-amber-500/80 border border-amber-500/30 px-3 py-1 rounded-full uppercase tracking-wider">
+               Exit
+            </button>
+            <button onClick={toggleSound} className="text-xs px-2 py-1 bg-black/40 rounded-full border border-amber-500/30 text-amber-300">
+               {isMuted ? '🔇' : '🔊'}
+            </button>
+            <button onClick={() => setShowRulesModal(true)} className="text-xs px-2 py-1 bg-black/40 rounded-full border border-amber-500/30 text-amber-300">
+               📜
+            </button>
+         </div>
+
          <div className="flex gap-2">
-             {gameState.players.map(p => {
+             {gameState.players.filter(p => p.pieces.length > 0).map(p => {
                const isActive = p.id === gameState.currentPlayerId;
                return (
                  <div key={p.id} className={`w-5 h-5 rounded-full border-2 transition-all ${p.color} ${isActive ? 'scale-125 border-white shadow-[0_0_10px_white]' : 'border-transparent opacity-50'}`}></div>
@@ -416,7 +583,6 @@ export default function App() {
                   w-14 h-14 rounded-2xl bg-gradient-to-br ${currentPlayer.gradient} 
                   border-2 border-amber-500/50 shadow-lg flex flex-col items-center justify-center shrink-0 relative overflow-hidden
                `}>
-                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
                    <div className="text-xl relative z-10">{currentPlayer.isBot ? '🤖' : '👤'}</div>
                    <div className="text-[8px] font-bold text-white uppercase mt-1 relative z-10 max-w-[50px] truncate">{currentPlayer.name}</div>
                </div>
@@ -436,15 +602,24 @@ export default function App() {
           </div>
           
           {/* Moves Strip */}
-          <div className="h-6 mt-1 flex justify-center items-center">
+          <div className="h-8 mt-1 flex justify-center items-center gap-2">
              {gameState.diceValues.length > 0 ? (
-                <div className="flex gap-2 animate-pulse">
-                   {gameState.diceValues.map((v, i) => (
-                      <span key={i} className="bg-amber-500 text-black font-bold px-2 py-0.5 rounded shadow-lg text-xs">Move {v}</span>
-                   ))}
+                <div className="flex gap-2">
+                   {gameState.diceValues.map((v, i) => {
+                      const isSelected = gameState.selectedDieIndex === i;
+                      return (
+                        <button 
+                          key={i} 
+                          onClick={() => handleDiePillClick(i)}
+                          className={`font-bold px-3 py-1 rounded shadow-lg text-xs transition-all ${isSelected ? 'bg-amber-400 text-black ring-2 ring-white scale-110' : 'bg-amber-700 text-amber-100 hover:bg-amber-600'}`}
+                        >
+                          Move {v}
+                        </button>
+                      );
+                   })}
                 </div>
              ) : (
-                <span className="text-[10px] text-gray-600 uppercase tracking-widest">{gameState.isRolling ? 'Fates are turning...' : 'Waiting for roll...'}</span>
+                <span className="text-[10px] text-gray-400 uppercase tracking-widest">{gameState.isRolling ? 'Fates are turning...' : 'Waiting for roll...'}</span>
              )}
           </div>
       </div>
@@ -455,14 +630,26 @@ export default function App() {
         {/* Header */}
         <div className="bg-[#2a1b15]/80 backdrop-blur-md p-8 rounded-[2rem] border border-[#5d4037] shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-5 text-8xl transition-transform group-hover:rotate-12">🎲</div>
-          <button onClick={() => setSetupStep('MODE')} className="absolute top-6 right-6 text-xs font-bold text-amber-500/60 hover:text-amber-400 uppercase tracking-widest transition-colors">
-            Exit
-          </button>
-          <h1 className="text-4xl font-display font-bold text-amber-100">
+          
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-2">
+              <button onClick={toggleSound} className="text-xs px-3 py-1 bg-black/40 rounded-full border border-amber-500/30 text-amber-300 hover:bg-amber-500 hover:text-black transition-colors">
+                {isMuted ? '🔇 Muted' : '🔊 Sound On'}
+              </button>
+              <button onClick={() => setShowRulesModal(true)} className="text-xs px-3 py-1 bg-black/40 rounded-full border border-amber-500/30 text-amber-300 hover:bg-amber-500 hover:text-black transition-colors">
+                📜 Rules
+              </button>
+            </div>
+            <button onClick={() => setSetupStep('MODE')} className="text-xs font-bold text-amber-500/60 hover:text-amber-400 uppercase tracking-widest transition-colors">
+              Exit
+            </button>
+          </div>
+
+          <h1 className="text-4xl font-display font-bold text-amber-100 mt-2">
             {gameState.boardSize === 5 ? 'Ashta Chamma' : 'Baara Katta'}
           </h1>
           <div className="text-sm text-amber-600 mt-2 uppercase tracking-widest font-bold">
-            Royal Court • {selectedMode.replace(/_/g, " ")}
+            Royal Court • {selectedMode.replace(/_/g, " ")} ({gameState.playerCount === 2 ? '1v1 Duel' : '4-Player Melee'})
           </div>
         </div>
 
@@ -482,7 +669,7 @@ export default function App() {
              </div>
              <div>
                <div className="text-amber-500/80 text-xs uppercase tracking-[0.2em] font-bold mb-1">Active Player</div>
-               <div className={`font-display text-4xl font-bold text-white`}>{currentPlayer.name}</div>
+               <div className={`font-display text-3xl font-bold text-white`}>{currentPlayer.name}</div>
              </div>
           </div>
 
@@ -497,11 +684,18 @@ export default function App() {
 
           {gameState.diceValues.length > 0 && (
              <div className="mt-6 flex justify-center gap-3">
-               {gameState.diceValues.map((v, i) => (
-                 <div key={i} className="animate-bounce w-12 h-12 rounded-xl bg-amber-500 text-[#2a1b15] font-bold text-2xl flex items-center justify-center shadow-lg border-b-4 border-amber-800">
-                   {v}
-                 </div>
-               ))}
+               {gameState.diceValues.map((v, i) => {
+                 const isSelected = gameState.selectedDieIndex === i;
+                 return (
+                   <button 
+                    key={i} 
+                    onClick={() => handleDiePillClick(i)}
+                    className={`w-12 h-12 rounded-xl font-bold text-2xl flex items-center justify-center shadow-lg border-b-4 transition-all ${isSelected ? 'bg-amber-300 text-black border-amber-600 scale-110 ring-4 ring-amber-400' : 'bg-amber-500 text-[#2a1b15] border-amber-800 hover:scale-105'}`}
+                   >
+                     {v}
+                   </button>
+                 );
+               })}
              </div>
           )}
         </div>
@@ -522,14 +716,14 @@ export default function App() {
          
          {/* Simple Scoreboard */}
          <div className="bg-[#2a1b15] p-5 rounded-[2rem] border border-[#5d4037]">
-            {gameState.players.map(p => {
+            {gameState.players.filter(p => p.pieces.length > 0).map(p => {
                  const finished = p.pieces.filter(pc => pc.status === PieceStatus.FINISHED).length;
                  return (
                      <div key={p.id} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                          <div className={`text-sm font-bold ${p.text}`}>{p.name}</div>
                          <div className="flex gap-1">
                             {Array.from({length: 4}).map((_, i) => (
-                                <div key={i} className={`w-2 h-2 rounded-full ${i < finished ? 'bg-amber-400' : 'bg-gray-800'}`}></div>
+                                <div key={i} className={`w-2.5 h-2.5 rounded-full ${i < finished ? 'bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]' : 'bg-gray-800'}`}></div>
                             ))}
                          </div>
                      </div>
@@ -537,6 +731,8 @@ export default function App() {
             })}
          </div>
       </div>
+
+      <RulesModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} />
 
     </div>
   );

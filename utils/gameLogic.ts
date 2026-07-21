@@ -148,72 +148,130 @@ export const movePiece = (
   return newState;
 };
 
-// BOT LOGIC
+export const getMovementPreview = (
+  gameState: GameState,
+  piece: Piece,
+  steps: number
+): { targetCoords: { r: number; c: number } | null; isSafe: boolean; isCapture: boolean; isFinish: boolean; isInnerEntry: boolean } | null => {
+  if (!canMovePiece(gameState, piece, steps)) return null;
 
-export const getBotMove = (gameState: GameState): { pieceIndex: number, diceValue: number } | null => {
+  const paths = getPaths(gameState.boardSize);
+  const path = paths[piece.owner];
+
+  let targetIndex = -1;
+  if (piece.status === PieceStatus.HOME) {
+    targetIndex = 0;
+  } else {
+    targetIndex = piece.pathIndex + steps;
+  }
+
+  if (targetIndex >= path.length - 1) {
+    return {
+      targetCoords: path[path.length - 1],
+      isSafe: true,
+      isCapture: false,
+      isFinish: true,
+      isInnerEntry: false
+    };
+  }
+
+  const targetCoords = path[targetIndex];
+  const safe = isSafeSquare(targetCoords.r, targetCoords.c, gameState.boardSize);
+  let capture = false;
+
+  if (!safe) {
+    gameState.players.forEach(p => {
+      if (p.id !== piece.owner) {
+        p.pieces.forEach(opp => {
+          if (opp.status === PieceStatus.ACTIVE) {
+            const oppPos = paths[p.id][opp.pathIndex];
+            if (oppPos.r === targetCoords.r && oppPos.c === targetCoords.c) {
+              capture = true;
+            }
+          }
+        });
+      }
+    });
+  }
+
+  const innerStart = getInnerCircleStartIndex(gameState.boardSize);
+  const isInnerEntry = (piece.pathIndex < innerStart) && (targetIndex >= innerStart);
+
+  return {
+    targetCoords,
+    isSafe: safe,
+    isCapture: capture,
+    isFinish: false,
+    isInnerEntry
+  };
+};
+
+// BOT LOGIC (Enhanced with BotDifficulty support)
+
+export const getBotMove = (gameState: GameState): { pieceIndex: number; diceValue: number } | null => {
   const player = gameState.players[gameState.currentPlayerId];
   const paths = getPaths(gameState.boardSize);
-  const possibleMoves: { pieceIndex: number, diceValue: number, score: number }[] = [];
+  const possibleMoves: { pieceIndex: number; diceValue: number; score: number }[] = [];
 
-  // Consider all unique dice values available
+  const difficulty = gameState.botDifficulty || 'STRATEGIST';
   const uniqueDice = Array.from(new Set(gameState.diceValues));
 
   for (const die of uniqueDice) {
     player.pieces.forEach((piece, idx) => {
       if (canMovePiece(gameState, piece, die)) {
         let score = 0;
-        
-        // 1. Base score for moving
-        score += 1;
 
         const path = paths[player.id];
         let targetIndex = -1;
 
         if (piece.status === PieceStatus.HOME) {
-           // Entry is good
-           score += 20; 
-           targetIndex = 0;
+          score += (difficulty === 'EMPEROR' ? 35 : 20);
+          targetIndex = 0;
         } else {
-           targetIndex = piece.pathIndex + die;
-           
-           // Distance factor (closer to win is better)
-           score += targetIndex; 
+          targetIndex = piece.pathIndex + die;
+          score += targetIndex; // Progress towards center
         }
 
-        // Check destination properties
         if (targetIndex >= path.length - 1) {
-            score += 200; // Finish!
+          score += (difficulty === 'EMPEROR' ? 300 : 200); // Winning/Finishing
         } else {
-            const targetPos = path[targetIndex];
-            const isSafe = isSafeSquare(targetPos.r, targetPos.c, gameState.boardSize);
+          const targetPos = path[targetIndex];
+          const isSafe = isSafeSquare(targetPos.r, targetPos.c, gameState.boardSize);
 
-            // Safety Bonus
-            if (isSafe) {
-               score += 30; 
-               // Huge bonus if moving OUT of danger? (Advanced, maybe later)
-            } else {
-               // Kill Check
-               let wouldKill = false;
-               gameState.players.forEach(p => {
-                  if (p.id !== player.id) {
-                      p.pieces.forEach(opp => {
-                          if (opp.status === PieceStatus.ACTIVE) {
-                              const oppPos = paths[p.id][opp.pathIndex];
-                              if (oppPos.r === targetPos.r && oppPos.c === targetPos.c) {
-                                  wouldKill = true;
-                              }
-                          }
-                      })
+          if (isSafe) {
+            score += (difficulty === 'EMPEROR' ? 45 : 30);
+          } else {
+            let wouldKill = false;
+            gameState.players.forEach(p => {
+              if (p.id !== player.id) {
+                p.pieces.forEach(opp => {
+                  if (opp.status === PieceStatus.ACTIVE) {
+                    const oppPos = paths[p.id][opp.pathIndex];
+                    if (oppPos.r === targetPos.r && oppPos.c === targetPos.c) {
+                      wouldKill = true;
+                    }
                   }
-               });
-               if (wouldKill) score += 100;
+                });
+              }
+            });
+            if (wouldKill) {
+              score += (difficulty === 'EMPEROR' ? 180 : 100);
             }
+          }
 
-            // Inner Circle Entry Bonus
-            const innerStart = getInnerCircleStartIndex(gameState.boardSize);
-            if (piece.pathIndex < innerStart && targetIndex >= innerStart) {
-                score += 50;
+          // Inner Circle Entry Bonus
+          const innerStart = getInnerCircleStartIndex(gameState.boardSize);
+          if (piece.pathIndex < innerStart && targetIndex >= innerStart) {
+            score += (difficulty === 'EMPEROR' ? 70 : 50);
+          }
+
+          // Escape Unsafe Square Bonus (Emperor mode)
+          if (difficulty === 'EMPEROR' && piece.status === PieceStatus.ACTIVE) {
+            const currentPos = path[piece.pathIndex];
+            if (!isSafeSquare(currentPos.r, currentPos.c, gameState.boardSize)) {
+              score += 25; // Reward escaping vulnerability
             }
+          }
         }
 
         possibleMoves.push({ pieceIndex: idx, diceValue: die, score });
@@ -223,8 +281,14 @@ export const getBotMove = (gameState: GameState): { pieceIndex: number, diceValu
 
   if (possibleMoves.length === 0) return null;
 
-  // Sort by score desc, then random shuffle for equal scores to feel natural
+  if (difficulty === 'NOVICE') {
+    // 40% chance to make a purely random move instead of optimal
+    if (Math.random() < 0.4) {
+      const randomIndex = Math.floor(Math.random() * possibleMoves.length);
+      return possibleMoves[randomIndex];
+    }
+  }
+
   possibleMoves.sort((a, b) => b.score - a.score || Math.random() - 0.5);
-  
   return possibleMoves[0];
 };

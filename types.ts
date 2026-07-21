@@ -18,6 +18,12 @@ export enum GameMode {
   ONLINE_RANDOM = 'ONLINE_RANDOM'
 }
 
+export enum BotDifficulty {
+  NOVICE = 'NOVICE',         // Casual/random moves
+  STRATEGIST = 'STRATEGIST', // Balanced tactical play
+  EMPEROR = 'EMPEROR'       // Aggressive minimax heuristic
+}
+
 export interface Coords {
   r: number;
   c: number;
@@ -41,13 +47,18 @@ export interface Player {
 
 export interface GameState {
   boardSize: 5 | 7;
+  playerCount: 2 | 4;
   players: Player[];
   currentPlayerId: PlayerId;
   diceValues: number[]; // Array of rolled values available to use (e.g. [4, 1])
+  selectedDieIndex: number | null; // Index of selected die value
+  selectedPiece: { owner: PlayerId; pieceId: number } | null;
   isRolling: boolean;
   winner: PlayerId | null;
   logs: string[];
   lastDiceFace: number | null; // For visual representation
   awaitingBonusRoll: boolean; // True if player gets an extra roll (e.g. after killing)
   gameMode: GameMode;
+  botDifficulty: BotDifficulty;
 }
+
