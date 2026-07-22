@@ -694,10 +694,10 @@ export default function App() {
                 />
              </div>
 
-             {/* Right: In-Place Action Slot (Roll Button OR Move Choice Pills) */}
-             <div className="shrink-0 flex items-center justify-end w-[130px] sm:w-[180px] h-full">
+             {/* Right: In-Place Action Slot (Move Choice Pills OR Tap Shells Prompt) */}
+             <div className="shrink-0 flex items-center justify-end w-[120px] sm:w-[160px] h-full">
                 {gameState.diceValues.length > 0 ? (
-                  /* Move Selection Pills replace Roll Button IN-PLACE */
+                  /* Move Selection Pills */
                   <div className="flex flex-col sm:flex-row gap-1.5 w-full">
                      {gameState.diceValues.map((v, i) => {
                        const isSelected = gameState.selectedDieIndex === i;
@@ -713,18 +713,11 @@ export default function App() {
                      })}
                   </div>
                 ) : (
-                  /* Roll Dice Button */
-                  <button
-                    onClick={handleRoll}
-                    disabled={gameState.winner !== null || currentPlayer.isBot || gameState.isRolling || (gameState.diceValues.length > 0 && !gameState.awaitingBonusRoll)}
-                    className={`w-full py-3 sm:py-3.5 rounded-xl font-display font-bold text-xs sm:text-sm uppercase tracking-widest shadow-xl border-2 transition-all text-center
-                      ${(!gameState.winner && !currentPlayer.isBot && (gameState.diceValues.length === 0 || gameState.awaitingBonusRoll)) 
-                        ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white border-amber-300 hover:from-amber-400 hover:to-amber-600 active:scale-95 animate-pulse-gold shadow-[0_0_20px_rgba(245,158,11,0.5)]' 
-                        : 'bg-gray-800/80 text-gray-500 border-gray-600 cursor-not-allowed grayscale'}
-                    `}
-                  >
-                    {gameState.isRolling ? 'Rolling...' : 'ROLL DICE'}
-                  </button>
+                  /* Tap Shells Prompt Badge */
+                  <div className="w-full py-2.5 sm:py-3 rounded-xl font-bold text-[10px] sm:text-xs text-amber-300/90 border border-amber-500/30 bg-amber-950/30 text-center flex items-center justify-center gap-1.5 shadow">
+                     <span>👈</span>
+                     <span>TAP SHELLS</span>
+                  </div>
                 )}
              </div>
 

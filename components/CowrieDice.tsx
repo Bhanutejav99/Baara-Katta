@@ -37,16 +37,16 @@ const CowrieShell: React.FC<{ isOpen: boolean; index: number; compact?: boolean 
           style={{ width: '100%', height: '100%', display: 'block', filter: 'drop-shadow(0px 8px 12px rgba(0,0,0,0.85))' }}
         >
           <defs>
-            {/* OPEN FACE: Luxurious Polished Ivory White & Cream */}
-            <linearGradient id={`open-ivory-grad-v3-${index}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            {/* OPEN FACE: Polished Ivory White & Cream */}
+            <linearGradient id={`open-ivory-grad-v5-${index}`} x1="0%" y1="0%" x2="100%" y2="100%">
                <stop offset="0%" stopColor="#ffffff" />
                <stop offset="45%" stopColor="#fffbeb" />
                <stop offset="85%" stopColor="#f1f5f9" />
                <stop offset="100%" stopColor="#cbd5e1" />
             </linearGradient>
 
-            {/* CLOSED BACK: Rich Warm Amber & Glossy Golden Mahogany */}
-            <radialGradient id={`closed-amber-grad-v3-${index}`} cx="40%" cy="30%" r="80%">
+            {/* CLOSED BACK: Glossy Golden Mahogany Amber */}
+            <radialGradient id={`closed-amber-grad-v5-${index}`} cx="40%" cy="30%" r="80%">
                 <stop offset="0%" stopColor="#fef08a" />
                 <stop offset="25%" stopColor="#f59e0b" />
                 <stop offset="65%" stopColor="#b45309" />
@@ -56,9 +56,9 @@ const CowrieShell: React.FC<{ isOpen: boolean; index: number; compact?: boolean 
           </defs>
 
           {isOpen ? (
-            /* FACE UP / OPEN SHELL (IVORY SLIT & NATURAL TEETH) */
+            /* FACE UP / OPEN SHELL (IVORY SLIT & TEETH) */
             <g>
-              <ellipse cx="50" cy="67.5" rx="45" ry="60" fill={`url(#open-ivory-grad-v3-${index})`} stroke="#94a3b8" strokeWidth="2.5" />
+              <ellipse cx="50" cy="67.5" rx="45" ry="60" fill={`url(#open-ivory-grad-v5-${index})`} stroke="#94a3b8" strokeWidth="2.5" />
               <ellipse cx="50" cy="67.5" rx="36" ry="50" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.5" />
               <path d="M50 14 Q 58 67.5 50 121" stroke="#0f172a" strokeWidth="5" fill="none" strokeLinecap="round" />
               {[26, 36, 46, 56, 66, 76, 86, 96, 106].map(y => (
@@ -68,9 +68,9 @@ const CowrieShell: React.FC<{ isOpen: boolean; index: number; compact?: boolean 
               <ellipse cx="32" cy="35" rx="8" ry="18" fill="#ffffff" fillOpacity="0.7" transform="rotate(-15 32 35)" />
             </g>
           ) : (
-            /* FACE DOWN / CLOSED SHELL (GLOSSY WARM AMBER DOME) */
+            /* FACE DOWN / CLOSED SHELL (GLOSSY AMBER DOME) */
             <g>
-               <ellipse cx="50" cy="67.5" rx="45" ry="60" fill={`url(#closed-amber-grad-v3-${index})`} stroke="#fbbf24" strokeWidth="2.5" />
+               <ellipse cx="50" cy="67.5" rx="45" ry="60" fill={`url(#closed-amber-grad-v5-${index})`} stroke="#fbbf24" strokeWidth="2.5" />
                <path d="M50 10 Q 88 67.5 50 125" stroke="rgba(255,255,255,0.7)" strokeWidth="3.5" fill="none" />
                <path d="M50 10 Q 12 67.5 50 125" stroke="rgba(0,0,0,0.5)" strokeWidth="3" fill="none" />
                <ellipse cx="32" cy="35" rx="14" ry="24" fill="#ffffff" fillOpacity="0.65" transform="rotate(-25 32 35)" />
@@ -95,8 +95,7 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({
   disabled, 
   canRoll, 
   layout = 'vertical', 
-  maxShells = 4,
-  hideButton = false
+  maxShells = 4
 }) => {
   const openCount = React.useMemo(() => {
      if (maxShells === 4) {
@@ -108,8 +107,6 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({
      }
   }, [value, maxShells]);
 
-  const closedCount = maxShells - openCount;
-
   const shells = React.useMemo(() => {
     const arr = Array(maxShells).fill(false);
     for (let i = 0; i < openCount; i++) arr[i] = true;
@@ -118,7 +115,7 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({
 
   const getLabel = () => {
     if (rolling) return 'Fates Turning...';
-    if (value === 0) return 'Roll Shells';
+    if (value === 0) return 'Tap / Swipe Shells';
 
     if (maxShells === 4) {
         if (value === 4) return '✨ CHOWKA (4) + BONUS ROLL!';
@@ -129,14 +126,6 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({
     }
     return `Score: ${value}`;
   };
-
-  const buttonBaseClass = `
-    relative overflow-hidden font-display font-bold tracking-widest text-white shadow-2xl transition-all duration-200
-    border-2 border-amber-300 rounded-2xl uppercase
-  `;
-  const buttonStateClass = disabled || !canRoll
-    ? 'bg-gray-800/80 text-gray-500 cursor-not-allowed border-gray-600 grayscale'
-    : 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 active:scale-95 shadow-[0_0_25px_rgba(245,158,11,0.6)] animate-pulse-gold';
 
   const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
 
@@ -153,8 +142,7 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({
     const deltaY = touch.clientY - touchStartRef.current.y;
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-    // If swipe or tap detected
-    if (distance >= 10 || distance >= 0) {
+    if (distance >= 5 || distance >= 0) {
       soundEngine.playShellRoll();
       onRoll();
     }
@@ -170,83 +158,75 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({
   if (layout === 'horizontal') {
     return (
       <div className="flex items-center justify-center gap-3 w-full h-full">
-         {/* Wooden Tray with Emerald Velvet Interior (Supports Tap + Swipe Gestures) */}
+         {/* Velvet Cowrie Shells Tray (Primary Interactive Roll Mechanism) */}
          <div 
            onTouchStart={handleTouchStart}
            onTouchEnd={handleTouchEnd}
            onClick={handleTrayClick}
-           className={`relative flex-shrink-0 p-2 sm:p-2.5 rounded-2xl bg-[#2a1b15] border-2 border-[#5d4037] shadow-[inset_0_2px_12px_rgba(0,0,0,0.9)] h-16 sm:h-20 w-auto min-w-[150px] sm:min-w-[180px] flex items-center justify-center overflow-hidden transition-transform active:scale-95
-             ${!disabled && canRoll ? 'cursor-pointer hover:border-amber-400 ring-1 ring-amber-500/30' : 'cursor-not-allowed'}
+           className={`relative flex-shrink-0 p-2 sm:p-2.5 rounded-2xl bg-[#2a1b15] border-2 shadow-[inset_0_2px_12px_rgba(0,0,0,0.9)] h-16 sm:h-20 w-auto min-w-[160px] sm:min-w-[200px] flex items-center justify-center overflow-hidden transition-all duration-300
+             ${!disabled && canRoll 
+               ? 'cursor-pointer border-amber-400 ring-2 ring-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.6)] animate-pulse scale-105 active:scale-95' 
+               : 'border-[#5d4037] opacity-80 cursor-not-allowed'}
            `}
            title="Tap or Swipe Shells to Roll"
          >
-            <div className="absolute inset-1 bg-gradient-to-br from-[#064e3b] to-[#022c22] opacity-90 rounded-xl shadow-inner border border-emerald-400/40 pointer-events-none"></div>
+            <div className="absolute inset-1 bg-gradient-to-br from-[#064e3b] via-[#043e2f] to-[#022c22] opacity-90 rounded-xl shadow-inner border border-emerald-400/40 pointer-events-none"></div>
+            
             <div className={`relative z-10 flex items-center justify-center gap-2 pointer-events-none ${rolling ? 'animate-bounce blur-[0.5px]' : ''}`}>
                 {shells.map((isOpen, idx) => (
                   <CowrieShell key={idx} index={idx} isOpen={isOpen} compact={true} />
                 ))}
             </div>
+
             {!disabled && canRoll && (
-              <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-bold text-amber-300/80 uppercase tracking-widest pointer-events-none whitespace-nowrap bg-black/60 px-1.5 rounded">
-                Swipe / Tap 🐚
+              <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[9px] font-extrabold text-amber-300 uppercase tracking-wider pointer-events-none whitespace-nowrap bg-black/80 px-2 py-0.2 rounded border border-amber-400/60 shadow animate-pulse">
+                TAP / SWIPE 🐚
               </div>
             )}
          </div>
 
-         {/* Roll Label */}
-         <div className="flex flex-col justify-center gap-1">
+         {/* Score / Roll Label */}
+         <div className="flex flex-col justify-center gap-0.5">
              <div className="text-[10px] sm:text-xs font-bold text-amber-300 uppercase tracking-widest text-center drop-shadow whitespace-nowrap">
                {getLabel()}
              </div>
-             {!hideButton && (
-               <button
-                onClick={() => { soundEngine.playShellRoll(); onRoll(); }}
-                disabled={disabled || !canRoll}
-                className={`${buttonBaseClass} ${buttonStateClass} w-full py-2 text-xs`}
-              >
-                ROLL DICE
-              </button>
-             )}
          </div>
       </div>
     );
   }
 
-  // Desktop Layout
+  // Vertical Desktop Layout
   return (
     <div className="flex flex-col items-center gap-5 w-full">
-      {/* 3D Wooden Tray with Emerald Velvet Interior */}
-      <div className="relative p-6 md:p-8 rounded-[2.5rem] bg-[#2a1b15] border-4 border-[#5d4037] shadow-[0_25px_50px_rgba(0,0,0,0.9)] w-full max-w-[340px] min-h-[230px] flex flex-col items-center justify-center overflow-hidden">
-         {/* Velvet Cushion Backdrop */}
-         <div className="absolute inset-2 bg-gradient-to-br from-[#064e3b] via-[#043e2f] to-[#022c22] rounded-[2rem] border-2 border-emerald-400/40 shadow-[inset_0_0_35px_rgba(0,0,0,0.95)]"></div>
+      <div 
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onClick={handleTrayClick}
+        className={`relative p-6 md:p-8 rounded-[2.5rem] bg-[#2a1b15] border-4 shadow-[0_25px_50px_rgba(0,0,0,0.9)] w-full max-w-[340px] min-h-[230px] flex flex-col items-center justify-center overflow-hidden transition-all duration-300
+          ${!disabled && canRoll 
+            ? 'cursor-pointer border-amber-400 ring-4 ring-amber-400/80 shadow-[0_0_30px_rgba(245,158,11,0.7)] animate-pulse scale-105 active:scale-95' 
+            : 'border-[#5d4037] opacity-80 cursor-not-allowed'}
+        `}
+      >
+         <div className="absolute inset-2 bg-gradient-to-br from-[#064e3b] via-[#043e2f] to-[#022c22] rounded-[2rem] border-2 border-emerald-400/40 shadow-[inset_0_0_35px_rgba(0,0,0,0.95)] pointer-events-none"></div>
          
-         {/* Shells Display */}
-         <div className={`relative z-10 flex flex-wrap justify-center items-center gap-4 ${rolling ? 'animate-bounce blur-[0.5px]' : ''} transition-all max-w-[280px]`}>
-            {shells.map((isOpen, idx) => (
+         <div className={`relative z-10 flex flex-wrap justify-center items-center gap-4 ${rolling ? 'animate-bounce blur-[0.5px]' : ''}`}>
+             {shells.map((isOpen, idx) => (
                <CowrieShell key={idx} index={idx} isOpen={isOpen} />
-            ))}
-        </div>
+             ))}
+         </div>
 
-        {/* Counter Summary Pill */}
-        <div className="relative z-10 mt-4 flex items-center gap-3 bg-black/75 px-4 py-1.5 rounded-full border border-amber-500/40 text-xs font-bold text-amber-200 shadow-md">
-           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-white border border-slate-400"></span> {openCount} Open (Ivory)</span>
-           <span className="text-amber-600">•</span>
-           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#54260a] border border-amber-600"></span> {closedCount} Back (Brown)</span>
-        </div>
+         {!disabled && canRoll && (
+           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs font-extrabold text-amber-300 uppercase tracking-widest pointer-events-none whitespace-nowrap bg-black/80 px-3 py-1 rounded-full border border-amber-400 shadow animate-pulse">
+             TAP OR SWIPE TO ROLL 🐚
+           </div>
+         )}
       </div>
-      
-      <div className="text-center w-full space-y-3">
-        <div className="text-xl font-display font-bold text-amber-300 uppercase tracking-[0.15em] drop-shadow-md min-h-[30px]">
-           {getLabel()}
-        </div>
-        
-        <button
-          onClick={() => { soundEngine.playShellRoll(); onRoll(); }}
-          disabled={disabled || !canRoll}
-          className={`${buttonBaseClass} ${buttonStateClass} w-full py-4 md:py-5 text-xl`}
-        >
-          ROLL DICE
-        </button>
+
+      <div className="text-center font-display">
+        <h3 className="text-lg font-bold text-amber-300 uppercase tracking-widest drop-shadow">
+          {getLabel()}
+        </h3>
       </div>
     </div>
   );
