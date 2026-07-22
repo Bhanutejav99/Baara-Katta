@@ -138,17 +138,59 @@ export const CowrieDice: React.FC<CowrieDiceProps> = ({
     ? 'bg-gray-800/80 text-gray-500 cursor-not-allowed border-gray-600 grayscale'
     : 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 active:scale-95 shadow-[0_0_25px_rgba(245,158,11,0.6)] animate-pulse-gold';
 
+  const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (disabled || !canRoll) return;
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (disabled || !canRoll || !touchStartRef.current) return;
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+    // If swipe or tap detected
+    if (distance >= 10 || distance >= 0) {
+      soundEngine.playShellRoll();
+      onRoll();
+    }
+    touchStartRef.current = null;
+  };
+
+  const handleTrayClick = () => {
+    if (disabled || !canRoll) return;
+    soundEngine.playShellRoll();
+    onRoll();
+  };
+
   if (layout === 'horizontal') {
     return (
       <div className="flex items-center justify-center gap-3 w-full h-full">
-         {/* Wooden Tray with Emerald Velvet Interior */}
-         <div className="relative flex-shrink-0 p-2 sm:p-2.5 rounded-2xl bg-[#2a1b15] border-2 border-[#5d4037] shadow-[inset_0_2px_12px_rgba(0,0,0,0.9)] h-16 sm:h-20 w-auto min-w-[150px] sm:min-w-[180px] flex items-center justify-center overflow-hidden">
-            <div className="absolute inset-1 bg-gradient-to-br from-[#064e3b] to-[#022c22] opacity-90 rounded-xl shadow-inner border border-emerald-400/40"></div>
-            <div className={`relative z-10 flex items-center justify-center gap-2 ${rolling ? 'animate-bounce blur-[0.5px]' : ''}`}>
+         {/* Wooden Tray with Emerald Velvet Interior (Supports Tap + Swipe Gestures) */}
+         <div 
+           onTouchStart={handleTouchStart}
+           onTouchEnd={handleTouchEnd}
+           onClick={handleTrayClick}
+           className={`relative flex-shrink-0 p-2 sm:p-2.5 rounded-2xl bg-[#2a1b15] border-2 border-[#5d4037] shadow-[inset_0_2px_12px_rgba(0,0,0,0.9)] h-16 sm:h-20 w-auto min-w-[150px] sm:min-w-[180px] flex items-center justify-center overflow-hidden transition-transform active:scale-95
+             ${!disabled && canRoll ? 'cursor-pointer hover:border-amber-400 ring-1 ring-amber-500/30' : 'cursor-not-allowed'}
+           `}
+           title="Tap or Swipe Shells to Roll"
+         >
+            <div className="absolute inset-1 bg-gradient-to-br from-[#064e3b] to-[#022c22] opacity-90 rounded-xl shadow-inner border border-emerald-400/40 pointer-events-none"></div>
+            <div className={`relative z-10 flex items-center justify-center gap-2 pointer-events-none ${rolling ? 'animate-bounce blur-[0.5px]' : ''}`}>
                 {shells.map((isOpen, idx) => (
                   <CowrieShell key={idx} index={idx} isOpen={isOpen} compact={true} />
                 ))}
             </div>
+            {!disabled && canRoll && (
+              <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-bold text-amber-300/80 uppercase tracking-widest pointer-events-none whitespace-nowrap bg-black/60 px-1.5 rounded">
+                Swipe / Tap 🐚
+              </div>
+            )}
          </div>
 
          {/* Roll Label */}
