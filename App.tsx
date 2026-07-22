@@ -5,6 +5,7 @@ import { canMovePiece, movePiece, getBotMove, checkWinner } from './utils/gameLo
 import { Board, THEME_STYLES } from './components/Board';
 import { CowrieDice } from './components/CowrieDice';
 import { RulesModal } from './components/RulesModal';
+import { InstallModal } from './components/InstallModal';
 import { soundEngine } from './utils/audio';
 
 // --- INITIAL DATA & TYPES ---
@@ -159,7 +160,34 @@ export default function App() {
   const [roomCode, setRoomCode] = useState("");
   const [isMuted, setIsMuted] = useState(soundEngine.getMuted());
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [gameState, setGameState] = useState<GameState>(INITIAL_STATE(7, GameMode.PASS_N_PLAY, BotDifficulty.STRATEGIST, 2));
+
+  // Listen for native PWA install prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choiceResult = await deferredPrompt.userChoice;
+      if (choiceResult.outcome === 'accepted') {
+        console.log('User accepted PWA install');
+      }
+      setDeferredPrompt(null);
+    }
+    setShowInstallModal(false);
+  };
 
   // Bot Logic Timers
   const botRollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -575,7 +603,15 @@ export default function App() {
             </span>
          </div>
 
-         <div className="flex items-center gap-2">
+         <div className="flex items-center gap-1.5 sm:gap-2">
+            <button 
+              onClick={() => setShowInstallModal(true)} 
+              className="text-xs px-2.5 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold rounded-full border border-amber-300 transition-all uppercase tracking-wider flex items-center gap-1 shadow animate-pulse"
+              title="Install Web App"
+            >
+              <span>📲</span>
+              <span className="hidden xs:inline">App</span>
+            </button>
             <button 
               onClick={cycleTheme} 
               className="text-xs px-2.5 py-1 bg-amber-950/80 rounded-full border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-black transition-colors font-bold uppercase tracking-wider flex items-center gap-1 shadow"
@@ -696,6 +732,12 @@ export default function App() {
       </div>
 
       <RulesModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} />
+      <InstallModal 
+         isOpen={showInstallModal} 
+         onClose={() => setShowInstallModal(false)} 
+         deferredPrompt={deferredPrompt} 
+         onInstallClick={handleInstallClick} 
+      />
 
     </div>
   );
