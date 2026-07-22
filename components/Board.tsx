@@ -310,8 +310,8 @@ export const Board: React.FC<BoardProps> = ({ gameState, onPieceClick }) => {
           <div 
             className={`relative z-20 grid gap-[1.5px] sm:gap-[2px] ${themeStyle.gridBg} border-[4px] border-[#4e342e] shadow-[inset_0_0_20px_rgba(0,0,0,0.95)] rounded-2xl overflow-visible transition-colors duration-500`}
             style={{ 
-              width: 'min(86vw, 56vh)', 
-              height: 'min(86vw, 56vh)',
+              width: 'min(82vw, 44vh)', 
+              height: 'min(82vw, 44vh)',
               gridTemplateColumns: `repeat(${boardSize}, minmax(0, 1fr))`,
               gridTemplateRows: `repeat(${boardSize}, minmax(0, 1fr))`
             }}

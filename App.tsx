@@ -662,8 +662,8 @@ export default function App() {
           )}
       </div>
 
-      {/* BOTTOM UNIFIED GAME CONTROL DOCK (LOCKED FIXED HEIGHT, ZERO LAYOUT JUMPING) */}
-      <div className="w-full bg-[#1a0f0d] border-t-2 border-[#5d4037] px-4 py-2 z-40 shrink-0 h-24 sm:h-28 shadow-[0_-10px_30px_rgba(0,0,0,0.9)] flex items-center">
+      {/* BOTTOM UNIFIED GAME CONTROL DOCK (ELEVATED SAFE AREA FOR EASY MOBILE THUMB REACH) */}
+      <div className="w-full bg-[#1a0f0d] border-t-2 border-[#5d4037] px-4 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 shrink-0 h-28 sm:h-32 shadow-[0_-10px_30px_rgba(0,0,0,0.9)] flex items-center">
          <div className="max-w-4xl mx-auto w-full flex items-center justify-between gap-3 h-full">
              
              {/* Left: Active Player Pill */}
